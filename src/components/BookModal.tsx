@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/trpc/react";
 import { type BookRecommendation } from "@/lib/gemini";
 import { BookMetadata } from "./BookMetadata";
@@ -13,7 +13,10 @@ interface BookModalProps {
   onClose: () => void;
 }
 
-export function BookModal({ book, onClose }: BookModalProps) {
+export function BookModal({ book: initialBook, onClose }: BookModalProps) {
+  const [currentBook, setCurrentBook] = useState<BookRecommendation>(initialBook);
+  const [bookHistory, setBookHistory] = useState<BookRecommendation[]>([initialBook]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -25,20 +28,43 @@ export function BookModal({ book, onClose }: BookModalProps) {
   }, [onClose]);
 
   const descriptionQuery = api.books.generateDescription.useQuery({
-    title: book.title,
-    author: book.author,
+    title: currentBook.title,
+    author: currentBook.author,
   });
 
   const similarBooksQuery = api.books.getSimilarBooks.useQuery({
-    bookTitle: book.title,
+    bookTitle: currentBook.title,
     genre: null,
   });
+
+  const handleBookClick = (book: BookRecommendation) => {
+    setBookHistory(prev => [...prev, book]);
+    setCurrentBook(book);
+  };
+
+  const handleBack = () => {
+    if (bookHistory.length > 1) {
+      const newHistory = bookHistory.slice(0, -1);
+      setBookHistory(newHistory);
+      setCurrentBook(newHistory[newHistory.length - 1]);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-semibold">{book.title}</h2>
+          <div className="flex items-center gap-2">
+            {bookHistory.length > 1 && (
+              <button
+                onClick={handleBack}
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
+              >
+                ← Back
+              </button>
+            )}
+            <h2 className="text-xl font-semibold">{currentBook.title}</h2>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -50,7 +76,7 @@ export function BookModal({ book, onClose }: BookModalProps) {
         <div className="p-4 space-y-6">
           <div>
             <p className="text-lg mb-2">
-              By <span className="font-medium">{book.author}</span>
+              By <span className="font-medium">{currentBook.author}</span>
             </p>
             {descriptionQuery.isLoading ? (
               <div className="flex items-center justify-center py-4">
@@ -68,7 +94,7 @@ export function BookModal({ book, onClose }: BookModalProps) {
             ) : null}
           </div>
 
-          <BookMetadata title={book.title} author={book.author} />
+          <BookMetadata title={currentBook.title} author={currentBook.author} />
 
           {similarBooksQuery.isLoading ? (
             <div className="flex items-center justify-center py-4">
@@ -84,9 +110,16 @@ export function BookModal({ book, onClose }: BookModalProps) {
               <h3 className="text-lg font-medium mb-3">You Might Also Like</h3>
               <ul className="space-y-2">
                 {similarBooksQuery.data.map((similar, index) => (
-                  <li key={index} className="text-sm">
-                    <span className="font-medium">{similar.title}</span> by{" "}
-                    {similar.author}
+                  <li key={index}>
+                    <button
+                      onClick={() => handleBookClick(similar)}
+                      className="text-sm text-left w-full hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors"
+                    >
+                      <span className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                        {similar.title}
+                      </span>{" "}
+                      by {similar.author}
+                    </button>
                   </li>
                 ))}
               </ul>
