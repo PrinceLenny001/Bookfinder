@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface BookCoverProps {
   title: string;
@@ -12,12 +12,43 @@ interface BookCoverProps {
 
 export function BookCover({ title, author, onClick, className = "" }: BookCoverProps) {
   const [imageError, setImageError] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   
-  // Create a URL-safe identifier for the book
-  const identifier = encodeURIComponent(`${title} ${author}`);
-  
-  // Open Library cover URL
-  const coverUrl = `https://covers.openlibrary.org/b/title/${identifier}-L.jpg`;
+  useEffect(() => {
+    const fetchCoverUrl = async () => {
+      try {
+        // Try to get OLID first
+        const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`;
+        const response = await fetch(searchUrl);
+        const data = await response.json();
+        
+        if (data.docs && data.docs.length > 0) {
+          const book = data.docs[0];
+          
+          // Try ISBN first
+          if (book.isbn && book.isbn.length > 0) {
+            setCoverUrl(`https://covers.openlibrary.org/b/isbn/${book.isbn[0]}-L.jpg`);
+            return;
+          }
+          
+          // Then try OLID
+          if (book.key) {
+            const olid = book.key.split('/')[2];
+            setCoverUrl(`https://covers.openlibrary.org/b/olid/${olid}-L.jpg`);
+            return;
+          }
+        }
+        
+        // Fallback to title-based URL
+        setCoverUrl(`https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-L.jpg`);
+      } catch (error) {
+        console.error('Error fetching book cover:', error);
+        setImageError(true);
+      }
+    };
+    
+    fetchCoverUrl();
+  }, [title, author]);
   
   // Fallback cover with title and author
   const FallbackCover = () => (
@@ -34,6 +65,17 @@ export function BookCover({ title, author, onClick, className = "" }: BookCoverP
     </div>
   );
 
+  if (imageError || !coverUrl) {
+    return (
+      <div 
+        data-testid="book-cover"
+        className={`relative aspect-[2/3] rounded-lg overflow-hidden shadow-md ${className}`}
+      >
+        <FallbackCover />
+      </div>
+    );
+  }
+
   return (
     <div 
       data-testid="book-cover"
@@ -44,31 +86,25 @@ export function BookCover({ title, author, onClick, className = "" }: BookCoverP
         ${className}
       `}
     >
-      {!imageError ? (
-        <>
-          <Image
-            src={coverUrl}
-            alt={`Cover of ${title} by ${author}`}
-            fill
-            className="
-              object-cover
-              group-hover:scale-105 transition-transform duration-300
-            "
-            onClick={onClick}
-            onError={() => setImageError(true)}
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
-          />
-          <div 
-            className="
-              absolute inset-0 bg-black/0 group-hover:bg-black/20
-              transition-colors duration-300
-            "
-            onClick={onClick}
-          />
-        </>
-      ) : (
-        <FallbackCover />
-      )}
+      <Image
+        src={coverUrl}
+        alt={`Cover of ${title} by ${author}`}
+        fill
+        className="
+          object-cover
+          group-hover:scale-105 transition-transform duration-300
+        "
+        onClick={onClick}
+        onError={() => setImageError(true)}
+        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+      />
+      <div 
+        className="
+          absolute inset-0 bg-black/0 group-hover:bg-black/20
+          transition-colors duration-300
+        "
+        onClick={onClick}
+      />
     </div>
   );
 } 
