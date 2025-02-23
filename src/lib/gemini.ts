@@ -51,10 +51,44 @@ export async function getBookRecommendations(minLexile: number, maxLexile: numbe
   }
 }
 
-export async function getSimilarBooks(bookTitle: string): Promise<BookRecommendation[]> {
+export async function getBooksByGenre(minLexile: number, maxLexile: number, genre: string): Promise<BookRecommendation[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-  const prompt = `Please recommend 5-10 book titles that middle school students who enjoyed "${bookTitle}" might also like.
+  const prompt = `Please recommend 5-10 ${genre} book titles suitable for middle school students with a Lexile range between ${minLexile}L and ${maxLexile}L. 
+  For each book, provide the title and author. Format your response as a JSON array with objects containing 'title' and 'author' properties.
+  Only include books that are appropriate for middle school students, fall within the specified Lexile range, and belong to the ${genre} genre.
+  Example format:
+  [
+    {
+      "title": "Book Title",
+      "author": "Author Name"
+    }
+  ]`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error("Failed to parse book recommendations from AI response");
+    }
+    
+    const recommendations = JSON.parse(jsonMatch[0]) as BookRecommendation[];
+    return recommendations;
+  } catch (error) {
+    console.error("Error getting book recommendations by genre:", error);
+    throw error;
+  }
+}
+
+export async function getSimilarBooks(bookTitle: string, genre: string | null = null): Promise<BookRecommendation[]> {
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+  const genreFilter = genre ? ` in the ${genre} genre` : '';
+  const prompt = `Please recommend 5-10 book titles${genreFilter} that middle school students who enjoyed "${bookTitle}" might also like.
   Consider similar themes, writing style, and reading level.
   For each book, provide the title and author. Format your response as a JSON array with objects containing 'title' and 'author' properties.
   Only include books that are appropriate for middle school students.

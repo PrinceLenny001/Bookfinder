@@ -1,6 +1,21 @@
 import { z } from "zod";
 import { publicProcedure, createTRPCRouter } from "../trpc";
-import { getBookRecommendations, getSimilarBooks, generateBookDescription, getBookMetadata } from "../../gemini";
+import { getBookRecommendations, getSimilarBooks, generateBookDescription, getBookMetadata, getBooksByGenre } from "../../gemini";
+
+const GENRES = [
+  "Fantasy",
+  "Science Fiction",
+  "Mystery",
+  "Adventure",
+  "Realistic Fiction",
+  "Historical Fiction",
+  "Graphic Novels",
+  "Horror",
+  "Poetry",
+  "Biography",
+  "Sports",
+  "Humor",
+] as const;
 
 export const booksRouter = createTRPCRouter({
   getRecommendations: publicProcedure
@@ -8,10 +23,14 @@ export const booksRouter = createTRPCRouter({
       z.object({
         minLexile: z.number(),
         maxLexile: z.number(),
+        genre: z.enum(GENRES).nullable(),
       })
     )
     .query(async ({ input }) => {
-      const { minLexile, maxLexile } = input;
+      const { minLexile, maxLexile, genre } = input;
+      if (genre) {
+        return getBooksByGenre(minLexile, maxLexile, genre);
+      }
       return getBookRecommendations(minLexile, maxLexile);
     }),
   
@@ -19,11 +38,12 @@ export const booksRouter = createTRPCRouter({
     .input(
       z.object({
         bookTitle: z.string(),
+        genre: z.enum(GENRES).nullable(),
       })
     )
     .query(async ({ input }) => {
-      const { bookTitle } = input;
-      return getSimilarBooks(bookTitle);
+      const { bookTitle, genre } = input;
+      return getSimilarBooks(bookTitle, genre);
     }),
 
   generateDescription: publicProcedure

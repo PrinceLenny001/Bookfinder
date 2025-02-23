@@ -1,130 +1,147 @@
 "use client";
 
-import React, { useState, ChangeEvent, useEffect } from "react";
+import { useState, type ChangeEvent } from "react";
 import { api } from "@/lib/trpc/react";
-import { toast } from "react-toastify";
-import type { BookRecommendation } from "@/lib/gemini";
+import { type BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
+import { GenreSearch } from "./GenreSearch";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
   className?: string;
 }
 
+const GENRES = [
+  "Fantasy",
+  "Science Fiction",
+  "Mystery",
+  "Adventure",
+  "Realistic Fiction",
+  "Historical Fiction",
+  "Graphic Novels",
+  "Horror",
+  "Poetry",
+  "Biography",
+  "Sports",
+  "Humor",
+] as const;
+
+type Genre = (typeof GENRES)[number];
+
 export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeInputProps) {
-  const [minLexile, setMinLexile] = useState<string>("");
-  const [maxLexile, setMaxLexile] = useState<string>("");
+  const [minLexile, setMinLexile] = useState("");
+  const [maxLexile, setMaxLexile] = useState("");
   const [error, setError] = useState<string>("");
   const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+
+  const handleChange = (value: string, isMin: boolean) => {
+    const numValue = value.replace(/[^0-9]/g, "");
+    if (isMin) {
+      setMinLexile(numValue);
+    } else {
+      setMaxLexile(numValue);
+    }
+
+    if (numValue && (parseInt(numValue) < 0 || parseInt(numValue) > 2000)) {
+      setError("Lexile range should be between 0 and 2000");
+    } else {
+      setError("");
+    }
+
+    if (onRangeChange) {
+      onRangeChange(
+        parseInt(isMin ? numValue : minLexile) || 0,
+        parseInt(isMin ? maxLexile : numValue) || 0
+      );
+    }
+  };
 
   const recommendationsQuery = api.books.getRecommendations.useQuery(
     {
       minLexile: parseInt(minLexile) || 0,
       maxLexile: parseInt(maxLexile) || 0,
+      genre: selectedGenre,
     },
     {
       enabled: Boolean(minLexile && maxLexile && !error),
-      retry: false,
     }
   );
 
-  useEffect(() => {
-    if (recommendationsQuery.error) {
-      toast.error("Failed to get book recommendations: " + recommendationsQuery.error.message);
-    }
-  }, [recommendationsQuery.error]);
-
-  const handleChange = (value: string, isMin: boolean) => {
-    // Remove non-numeric characters except minus sign
-    const numericValue = value.replace(/[^\d-]/g, "");
-    
-    if (isMin) {
-      setMinLexile(numericValue);
-    } else {
-      setMaxLexile(numericValue);
-    }
-
-    // Validate and update parent
-    if (numericValue && !isMin && minLexile) {
-      const min = parseInt(minLexile);
-      const max = parseInt(numericValue);
-      
-      if (min > max) {
-        setError("Minimum Lexile must be less than maximum");
-      } else {
-        setError("");
-        onRangeChange?.(min, max);
-      }
-    }
-  };
-
-  const handleBookClick = (book: BookRecommendation) => {
-    setSelectedBook(book);
-  };
-
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <label 
-            htmlFor="min-lexile" 
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
-          >
-            Minimum Lexile
-          </label>
-          <div className="relative">
-            <input
-              id="min-lexile"
-              type="text"
-              value={minLexile}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, true)}
-              placeholder="e.g. 600"
-              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
-            />
-            <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <label 
+              htmlFor="min-lexile" 
+              className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+            >
+              Minimum Lexile
+            </label>
+            <div className="relative">
+              <input
+                id="min-lexile"
+                type="text"
+                value={minLexile}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, true)}
+                placeholder="e.g. 600"
+                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
+              />
+              <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <label 
+              htmlFor="max-lexile" 
+              className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+            >
+              Maximum Lexile
+            </label>
+            <div className="relative">
+              <input
+                id="max-lexile"
+                type="text"
+                value={maxLexile}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, false)}
+                placeholder="e.g. 800"
+                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
+              />
+              <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
+            </div>
           </div>
         </div>
-        <div className="flex-1">
-          <label 
-            htmlFor="max-lexile" 
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
-          >
-            Maximum Lexile
-          </label>
-          <div className="relative">
-            <input
-              id="max-lexile"
-              type="text"
-              value={maxLexile}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, false)}
-              placeholder="e.g. 800"
-              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
-            />
-            <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
-          </div>
-        </div>
+
+        <GenreSearch
+          selectedGenre={selectedGenre}
+          onGenreSelect={setSelectedGenre}
+        />
       </div>
+
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
-      {recommendationsQuery.isLoading && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">Loading recommendations...</p>
-      )}
-      {recommendationsQuery.data && (
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-4">Recommended Books</h3>
-          <BookGrid 
-            books={recommendationsQuery.data} 
-            onBookClick={handleBookClick}
-            className="mb-4"
-          />
+
+      {recommendationsQuery.isLoading ? (
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            ))}
+          </div>
         </div>
+      ) : recommendationsQuery.error ? (
+        <div className="text-red-500">
+          Error: {recommendationsQuery.error.message}
+        </div>
+      ) : recommendationsQuery.data ? (
+        <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
+      ) : null}
+
+      {selectedBook && (
+        <BookModal book={selectedBook} onClose={() => setSelectedBook(null)} />
       )}
-      <BookModal 
-        book={selectedBook} 
-        onClose={() => setSelectedBook(null)} 
-      />
     </div>
   );
 } 
