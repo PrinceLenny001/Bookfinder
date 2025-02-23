@@ -5,6 +5,7 @@ import { api } from "@/lib/trpc/react";
 import { toast } from "react-toastify";
 import type { BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
+import { BookModal } from "./BookModal";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -120,6 +121,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
           />
         </div>
       )}
+      <BookModal 
+        book={selectedBook} 
+        onClose={() => setSelectedBook(null)} 
+      />
     </div>
   );
 } 
