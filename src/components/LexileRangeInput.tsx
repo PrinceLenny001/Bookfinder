@@ -6,7 +6,7 @@ import { type BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
 import { GenreSearch } from "./GenreSearch";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Search } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorMessage } from "./ErrorMessage";
 
@@ -32,44 +32,45 @@ const GENRES = [
 
 type Genre = (typeof GENRES)[number];
 
+// Middle school Lexile ranges typically fall between 600L and 1000L
+const DEFAULT_MIN_LEXILE = 600;
+const DEFAULT_MAX_LEXILE = 1000;
+const MIN_LEXILE = 0;
+const MAX_LEXILE = 1500;
+
 export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeInputProps) {
-  const [minLexile, setMinLexile] = useState("");
-  const [maxLexile, setMaxLexile] = useState("");
+  const [minLexile, setMinLexile] = useState(DEFAULT_MIN_LEXILE);
+  const [maxLexile, setMaxLexile] = useState(DEFAULT_MAX_LEXILE);
+  const [searchTitle, setSearchTitle] = useState("");
   const [error, setError] = useState<string>("");
   const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  const handleChange = (value: string, isMin: boolean) => {
-    const numValue = value.replace(/[^0-9]/g, "");
+  const handleRangeChange = (value: number, isMin: boolean) => {
     if (isMin) {
-      setMinLexile(numValue);
+      setMinLexile(Math.min(value, maxLexile - 100));
     } else {
-      setMaxLexile(numValue);
-    }
-
-    if (numValue && (parseInt(numValue) < 0 || parseInt(numValue) > 2000)) {
-      setError("Lexile range should be between 0 and 2000");
-    } else {
-      setError("");
+      setMaxLexile(Math.max(value, minLexile + 100));
     }
 
     if (onRangeChange) {
       onRangeChange(
-        parseInt(isMin ? numValue : minLexile) || 0,
-        parseInt(isMin ? maxLexile : numValue) || 0
+        isMin ? value : minLexile,
+        isMin ? maxLexile : value
       );
     }
   };
 
   const recommendationsQuery = api.books.getRecommendations.useQuery(
     {
-      minLexile: parseInt(minLexile) || 0,
-      maxLexile: parseInt(maxLexile) || 0,
+      minLexile,
+      maxLexile,
       genre: selectedGenre,
+      title: searchTitle || undefined,
     },
     {
-      enabled: Boolean(minLexile && maxLexile && !error),
+      enabled: Boolean((minLexile && maxLexile && !error) || searchTitle),
     }
   );
 
@@ -89,7 +90,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
           <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
             <p>Here's how to find books that are just right for you:</p>
             <ol className="list-decimal list-inside space-y-1">
-              <li>Enter your Lexile range (ask your teacher if you're not sure)</li>
+              <li>Search by title or adjust the Lexile range slider</li>
               <li>Choose a genre you enjoy (optional)</li>
               <li>Click on any book to learn more about it</li>
             </ol>
@@ -98,43 +99,45 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       </div>
 
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchTitle}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTitle(e.target.value)}
+            placeholder="Search by title..."
+            className="block w-full rounded-md border border-gray-300 dark:border-gray-600 pl-10 pr-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
+          />
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+        </div>
+
+        <div className="space-y-4">
+          <div>
             <label 
-              htmlFor="min-lexile" 
               className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
             >
-              Minimum Lexile
+              Lexile Range: {minLexile}L - {maxLexile}L
             </label>
-            <div className="relative">
-              <input
-                id="min-lexile"
-                type="text"
-                value={minLexile}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, true)}
-                placeholder="e.g. 600"
-                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
-              />
-              <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
-            </div>
-          </div>
-          <div className="flex-1">
-            <label 
-              htmlFor="max-lexile" 
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
-            >
-              Maximum Lexile
-            </label>
-            <div className="relative">
-              <input
-                id="max-lexile"
-                type="text"
-                value={maxLexile}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, false)}
-                placeholder="e.g. 800"
-                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
-              />
-              <span className="absolute right-3 top-2 text-gray-500 dark:text-gray-400">L</span>
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="range"
+                  min={MIN_LEXILE}
+                  max={MAX_LEXILE}
+                  value={minLexile}
+                  onChange={(e) => handleRangeChange(parseInt(e.target.value), true)}
+                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
+                />
+              </div>
+              <div>
+                <input
+                  type="range"
+                  min={MIN_LEXILE}
+                  max={MAX_LEXILE}
+                  value={maxLexile}
+                  onChange={(e) => handleRangeChange(parseInt(e.target.value), false)}
+                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -164,7 +167,8 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       ) : recommendationsQuery.data ? (
         <>
           <h3 className="text-lg font-medium mb-4">
-            {selectedGenre ? `${selectedGenre} Books` : 'Recommended Books'} for Your Level
+            {selectedGenre ? `${selectedGenre} Books` : searchTitle ? 'Search Results' : 'Recommended Books'} 
+            {!searchTitle && ' for Your Level'}
           </h3>
           <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
         </>

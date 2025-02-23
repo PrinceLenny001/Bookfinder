@@ -23,27 +23,49 @@ export const booksRouter = createTRPCRouter({
       z.object({
         minLexile: z.number(),
         maxLexile: z.number(),
-        genre: z.enum(GENRES).nullable(),
+        genre: z.enum([
+          "Fantasy",
+          "Science Fiction",
+          "Mystery",
+          "Adventure",
+          "Realistic Fiction",
+          "Historical Fiction",
+          "Graphic Novels",
+          "Horror",
+          "Poetry",
+          "Biography",
+          "Sports",
+          "Humor",
+        ]).nullable(),
+        title: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
-      const { minLexile, maxLexile, genre } = input;
-      if (genre) {
-        return getBooksByGenre(minLexile, maxLexile, genre);
-      }
-      return getBookRecommendations(minLexile, maxLexile);
+      return getBookRecommendations(input.minLexile, input.maxLexile, input.genre, input.title);
     }),
   
   getSimilarBooks: publicProcedure
     .input(
       z.object({
         bookTitle: z.string(),
-        genre: z.enum(GENRES).nullable(),
+        genre: z.enum([
+          "Fantasy",
+          "Science Fiction",
+          "Mystery",
+          "Adventure",
+          "Realistic Fiction",
+          "Historical Fiction",
+          "Graphic Novels",
+          "Horror",
+          "Poetry",
+          "Biography",
+          "Sports",
+          "Humor",
+        ]).nullable(),
       })
     )
     .query(async ({ input }) => {
-      const { bookTitle, genre } = input;
-      return getSimilarBooks(bookTitle, genre);
+      return getSimilarBooks(input.bookTitle, input.genre);
     }),
 
   generateDescription: publicProcedure
@@ -54,8 +76,7 @@ export const booksRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      const { title, author } = input;
-      return generateBookDescription(title, author);
+      return generateBookDescription(input.title, input.author);
     }),
 
   getMetadata: publicProcedure
@@ -66,7 +87,6 @@ export const booksRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      const { title, author } = input;
-      return getBookMetadata(title, author);
+      return getBookMetadata(input.title, input.author);
     }),
 }); 

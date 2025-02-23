@@ -14,3 +14,4 @@
 - Added integration tests for Gemini AI functions including getBookRecommendations, getSimilarBooks, generateBookDescription, and getBookMetadata with proper mocking and error handling.
 - Improved book cover fetching with ISBN and OLID support, better error handling, and fallback covers
 - Made similar book recommendations clickable with book history navigation
+- Added title search and Lexile range slider with middle school defaults
