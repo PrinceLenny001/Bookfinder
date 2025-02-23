@@ -12,6 +12,12 @@ export interface BookRecommendation {
   description?: string;
 }
 
+export interface BookMetadata {
+  ageRange: string;
+  contentWarnings: string[];
+  themes: string[];
+}
+
 export async function getBookRecommendations(minLexile: number, maxLexile: number): Promise<BookRecommendation[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -92,6 +98,40 @@ export async function generateBookDescription(title: string, author: string): Pr
     return response.text().trim();
   } catch (error) {
     console.error("Error generating book description:", error);
+    throw error;
+  }
+}
+
+export async function getBookMetadata(title: string, author: string): Promise<BookMetadata> {
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+  const prompt = `For the book "${title}" by ${author}, provide the following information in JSON format:
+  1. Age Range: A suitable age range for middle school readers (e.g., "11-14 years")
+  2. Content Warnings: A list of any content that parents or teachers should be aware of (e.g., mild violence, complex themes)
+  3. Themes: A list of main themes in the book
+
+  Format your response as a JSON object with the following structure:
+  {
+    "ageRange": "string",
+    "contentWarnings": ["string"],
+    "themes": ["string"]
+  }`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Failed to parse book metadata from AI response");
+    }
+    
+    const metadata = JSON.parse(jsonMatch[0]) as BookMetadata;
+    return metadata;
+  } catch (error) {
+    console.error("Error getting book metadata:", error);
     throw error;
   }
 } 
