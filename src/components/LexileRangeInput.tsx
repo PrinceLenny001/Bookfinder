@@ -6,6 +6,7 @@ import { type BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
 import { GenreSearch } from "./GenreSearch";
+import { HelpCircle } from "lucide-react";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -35,6 +36,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   const [error, setError] = useState<string>("");
   const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleChange = (value: string, isMin: boolean) => {
     const numValue = value.replace(/[^0-9]/g, "");
@@ -71,6 +73,28 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
+      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-4">
+        <h2 className="text-lg font-medium mb-2 flex items-center gap-2">
+          Find Your Perfect Book
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
+        </h2>
+        {showHelp && (
+          <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
+            <p>Here's how to find books that are just right for you:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Enter your Lexile range (ask your teacher if you're not sure)</li>
+              <li>Choose a genre you enjoy (optional)</li>
+              <li>Click on any book to learn more about it</li>
+            </ol>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
@@ -136,7 +160,12 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
           Error: {recommendationsQuery.error.message}
         </div>
       ) : recommendationsQuery.data ? (
-        <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
+        <>
+          <h3 className="text-lg font-medium mb-4">
+            {selectedGenre ? `${selectedGenre} Books` : 'Recommended Books'} for Your Level
+          </h3>
+          <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
+        </>
       ) : null}
 
       {selectedBook && (
