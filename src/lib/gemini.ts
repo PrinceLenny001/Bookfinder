@@ -41,14 +41,34 @@ export async function getBookRecommendations(
       }
     }
     
-    prompt += ` Return the response as a JSON array of objects with 'title' and 'author' properties.`;
+    prompt += ` Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
+    console.log("Sending prompt to Gemini:", prompt);
     const result = await model.generateContent(prompt);
-    const response = result.response.text();
-    return JSON.parse(response);
+    const text = result.response.text();
+    console.log("Raw Gemini response:", text);
+
+    // Try to extract JSON from the response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("Failed to extract JSON from response");
+      return [];
+    }
+
+    try {
+      const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
+      if (!Array.isArray(books) || !books.length) {
+        console.error("Parsed response is not a valid array of books");
+        return [];
+      }
+      return books;
+    } catch (parseError) {
+      console.error("Failed to parse JSON response:", parseError);
+      return [];
+    }
   } catch (error) {
     console.error("Error getting book recommendations:", error);
-    throw error;
+    return [];
   }
 }
 
@@ -94,14 +114,34 @@ export async function getSimilarBooks(
     if (genre) {
       prompt += ` in the ${genre} genre`;
     }
-    prompt += `. Return the response as a JSON array of objects with 'title' and 'author' properties.`;
+    prompt += `. Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
+    console.log("Sending prompt to Gemini:", prompt);
     const result = await model.generateContent(prompt);
-    const response = result.response.text();
-    return JSON.parse(response);
+    const text = result.response.text();
+    console.log("Raw Gemini response:", text);
+
+    // Try to extract JSON from the response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("Failed to extract JSON from response");
+      return [];
+    }
+
+    try {
+      const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
+      if (!Array.isArray(books) || !books.length) {
+        console.error("Parsed response is not a valid array of books");
+        return [];
+      }
+      return books;
+    } catch (parseError) {
+      console.error("Failed to parse JSON response:", parseError);
+      return [];
+    }
   } catch (error) {
     console.error("Error getting similar books:", error);
-    throw error;
+    return [];
   }
 }
 
@@ -112,33 +152,61 @@ export async function generateBookDescription(
   try {
     const prompt = `Write a short, engaging description of the book "${title}" by ${author} that would interest a middle school student. Keep it concise and focus on what makes the book interesting.`;
 
+    console.log("Sending prompt to Gemini:", prompt);
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    const text = result.response.text();
+    console.log("Raw Gemini response:", text);
+    return text.trim();
   } catch (error) {
     console.error("Error generating book description:", error);
-    throw error;
+    return "Description not available";
   }
 }
 
 export async function getBookMetadata(
   title: string,
   author: string
-): Promise<{
-  ageRange: string;
-  contentWarnings: string[];
-  themes: string[];
-}> {
+): Promise<BookMetadata> {
   try {
     const prompt = `For the book "${title}" by ${author}, provide the following metadata in JSON format:
     1. ageRange: A string indicating the appropriate age range (e.g., "12-14 years")
     2. contentWarnings: An array of strings for any content warnings
-    3. themes: An array of main themes in the book`;
+    3. themes: An array of main themes in the book
+    Format example: {"ageRange": "12-14 years", "contentWarnings": ["Mild violence"], "themes": ["Adventure", "Friendship"]}`;
 
+    console.log("Sending prompt to Gemini:", prompt);
     const result = await model.generateContent(prompt);
-    const response = result.response.text();
-    return JSON.parse(response);
+    const text = result.response.text();
+    console.log("Raw Gemini response:", text);
+
+    // Try to extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("Failed to extract JSON from response");
+      return {
+        ageRange: "Not available",
+        contentWarnings: [],
+        themes: [],
+      };
+    }
+
+    try {
+      const metadata = JSON.parse(jsonMatch[0]) as BookMetadata;
+      return metadata;
+    } catch (parseError) {
+      console.error("Failed to parse JSON response:", parseError);
+      return {
+        ageRange: "Not available",
+        contentWarnings: [],
+        themes: [],
+      };
+    }
   } catch (error) {
     console.error("Error getting book metadata:", error);
-    throw error;
+    return {
+      ageRange: "Not available",
+      contentWarnings: [],
+      themes: [],
+    };
   }
 } 

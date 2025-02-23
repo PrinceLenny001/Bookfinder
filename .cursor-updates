@@ -15,3 +15,4 @@
 - Improved book cover fetching with ISBN and OLID support, better error handling, and fallback covers
 - Made similar book recommendations clickable with book history navigation
 - Added title search and Lexile range slider with middle school defaults
+- Improved Gemini AI integration with better error handling and response parsing

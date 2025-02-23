@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent, useEffect } from "react";
 import { api } from "@/lib/trpc/react";
 import { type BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
@@ -9,6 +9,7 @@ import { GenreSearch } from "./GenreSearch";
 import { HelpCircle, Search } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorMessage } from "./ErrorMessage";
+import { TRPCClientError } from '@trpc/client';
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -67,12 +68,25 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       minLexile,
       maxLexile,
       genre: selectedGenre,
-      title: searchTitle || undefined,
+      title: searchTitle.trim() || undefined,
     },
     {
-      enabled: Boolean((minLexile && maxLexile && !error) || searchTitle),
+      enabled: Boolean((minLexile && maxLexile && !error) || searchTitle.trim()),
+      retry: 2,
+      retryDelay: 1000,
     }
   );
+
+  // Handle errors in the UI
+  useEffect(() => {
+    if (recommendationsQuery.error) {
+      console.error("Error fetching recommendations:", recommendationsQuery.error);
+      setError("Failed to fetch book recommendations. Please try again.");
+    }
+  }, [recommendationsQuery.error]);
+
+  const shouldShowResults = recommendationsQuery.data && recommendationsQuery.data.length > 0;
+  const noResultsFound = recommendationsQuery.data && recommendationsQuery.data.length === 0;
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
@@ -103,7 +117,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
           <input
             type="text"
             value={searchTitle}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTitle(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              setSearchTitle(e.target.value);
+              setError("");
+            }}
             placeholder="Search by title..."
             className="block w-full rounded-md border border-gray-300 dark:border-gray-600 pl-10 pr-4 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
           />
@@ -124,7 +141,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                   min={MIN_LEXILE}
                   max={MAX_LEXILE}
                   value={minLexile}
-                  onChange={(e) => handleRangeChange(parseInt(e.target.value), true)}
+                  onChange={(e) => {
+                    handleRangeChange(parseInt(e.target.value), true);
+                    setError("");
+                  }}
                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
                 />
               </div>
@@ -134,7 +154,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                   min={MIN_LEXILE}
                   max={MAX_LEXILE}
                   value={maxLexile}
-                  onChange={(e) => handleRangeChange(parseInt(e.target.value), false)}
+                  onChange={(e) => {
+                    handleRangeChange(parseInt(e.target.value), false);
+                    setError("");
+                  }}
                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
                 />
               </div>
@@ -144,7 +167,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
 
         <GenreSearch
           selectedGenre={selectedGenre}
-          onGenreSelect={setSelectedGenre}
+          onGenreSelect={(genre) => {
+            setSelectedGenre(genre);
+            setError("");
+          }}
         />
       </div>
 
@@ -161,10 +187,10 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
         </div>
       ) : recommendationsQuery.error ? (
         <ErrorMessage 
-          message={recommendationsQuery.error.message} 
+          message="Failed to fetch book recommendations. Please try again." 
           className="mt-4"
         />
-      ) : recommendationsQuery.data ? (
+      ) : shouldShowResults ? (
         <>
           <h3 className="text-lg font-medium mb-4">
             {selectedGenre ? `${selectedGenre} Books` : searchTitle ? 'Search Results' : 'Recommended Books'} 
@@ -172,6 +198,11 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
           </h3>
           <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
         </>
+      ) : noResultsFound ? (
+        <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+          <p>No books found matching your criteria.</p>
+          <p className="mt-2 text-sm">Try adjusting your search terms or Lexile range.</p>
+        </div>
       ) : null}
 
       {selectedBook && (
