@@ -36,6 +36,7 @@ export function BookCover({ title, author, onClick, className = "" }: BookCoverP
 
   return (
     <div 
+      data-testid="book-cover"
       className={`
         relative aspect-[2/3] rounded-lg overflow-hidden
         shadow-md hover:shadow-lg transition-all

@@ -34,19 +34,12 @@ export const WithDescription: Story = {
   },
 };
 
-export const WithoutDescription: Story = {
-  args: {
-    book: {
-      title: "Sample Book",
-      author: "Sample Author",
-    },
-    onClose: () => {},
-  },
-};
-
 export const Closed: Story = {
   args: {
-    book: null,
+    book: {
+      title: "Hidden Book",
+      author: "Hidden Author",
+    },
     onClose: () => {},
   },
 }; 

@@ -146,7 +146,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <ErrorMessage message={error} />
       )}
 
       {recommendationsQuery.isLoading ? (
