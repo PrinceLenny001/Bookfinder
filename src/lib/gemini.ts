@@ -77,4 +77,21 @@ export async function getSimilarBooks(bookTitle: string): Promise<BookRecommenda
     console.error("Error getting similar book recommendations:", error);
     throw error;
   }
+}
+
+export async function generateBookDescription(title: string, author: string): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+  const prompt = `Write a short, engaging book description for a middle school student for the book "${title}" by ${author}. 
+  The description should be concise (2-3 sentences) and highlight what makes the book interesting and appealing to middle school readers.
+  Focus on the main themes, characters, or plot elements that would grab a young reader's attention.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Error generating book description:", error);
+    throw error;
+  }
 } 

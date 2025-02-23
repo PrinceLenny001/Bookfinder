@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure, createTRPCRouter } from "../trpc";
-import { getBookRecommendations, getSimilarBooks } from "../../gemini";
+import { getBookRecommendations, getSimilarBooks, generateBookDescription } from "../../gemini";
 
 export const booksRouter = createTRPCRouter({
   getRecommendations: publicProcedure
@@ -24,5 +24,17 @@ export const booksRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { bookTitle } = input;
       return getSimilarBooks(bookTitle);
+    }),
+
+  generateDescription: publicProcedure
+    .input(
+      z.object({
+        title: z.string(),
+        author: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { title, author } = input;
+      return generateBookDescription(title, author);
     }),
 }); 

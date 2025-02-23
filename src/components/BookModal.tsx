@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { X } from "lucide-react";
 import type { BookRecommendation } from "@/lib/gemini";
+import { api } from "@/lib/trpc/react";
 
 interface BookModalProps {
   book: BookRecommendation | null;
@@ -11,6 +12,19 @@ interface BookModalProps {
 }
 
 export function BookModal({ book, onClose }: BookModalProps) {
+  const descriptionQuery = api.books.generateDescription.useQuery(
+    {
+      title: book?.title || "",
+      author: book?.author || "",
+    },
+    {
+      enabled: !!book && !book.description,
+      retry: false,
+    }
+  );
+
+  const description = book?.description || descriptionQuery.data;
+
   return (
     <Transition appear show={!!book} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -58,9 +72,13 @@ export function BookModal({ book, onClose }: BookModalProps) {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                     By {book?.author}
                   </p>
-                  {book?.description ? (
+                  {descriptionQuery.isLoading ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Generating description...
+                    </p>
+                  ) : description ? (
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {book.description}
+                      {description}
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400 italic">
