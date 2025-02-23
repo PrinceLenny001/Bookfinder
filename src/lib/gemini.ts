@@ -110,11 +110,17 @@ export async function getSimilarBooks(
   genre: string | null = null
 ): Promise<BookRecommendation[]> {
   try {
-    let prompt = `Recommend 5 books similar to "${bookTitle}"`;
+    let prompt = `Recommend 5 books that are very similar to "${bookTitle}"`;
     if (genre) {
       prompt += ` in the ${genre} genre`;
     }
-    prompt += `. Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
+    prompt += `. The recommendations should:
+    1. Be appropriate for the same age range as the original book
+    2. Have similar themes and content
+    3. Be at a similar reading level
+    4. Have similar writing style and complexity
+    
+    Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await model.generateContent(prompt);

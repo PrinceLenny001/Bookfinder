@@ -1,8 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
+
+// Cache for cover URLs to avoid refetching
+const coverUrlCache = new Map<string, string>();
 
 interface BookCoverProps {
   title: string;
@@ -20,19 +23,46 @@ export function BookCover({
   priority = false 
 }: BookCoverProps) {
   const [imageError, setImageError] = useState(false);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [coverUrl, setCoverUrl] = useState<string | null>(() => {
+    // Check cache on initial render
+    const cacheKey = `${title}-${author}`;
+    return coverUrlCache.get(cacheKey) || null;
+  });
+  const [isLoading, setIsLoading] = useState(!coverUrl);
   const [retryCount, setRetryCount] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
+    const cacheKey = `${title}-${author}`;
+    
+    // If we have a cached URL, use it
+    const cachedUrl = coverUrlCache.get(cacheKey);
+    if (cachedUrl) {
+      setCoverUrl(cachedUrl);
+      setIsLoading(false);
+      return;
+    }
+
     const fetchCoverUrl = async () => {
       try {
+        // Clean up previous fetch if it exists
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        
+        // Create new abort controller for this fetch
+        abortControllerRef.current = new AbortController();
+        
         setIsLoading(true);
         setImageError(false);
         
         // Try to get OLID first
         const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`;
-        const response = await fetch(searchUrl);
+        const response = await fetch(searchUrl, {
+          signal: abortControllerRef.current.signal,
+          headers: { 'Accept': 'application/json' }
+        });
         if (!response.ok) throw new Error('Failed to fetch book data');
         
         const data = await response.json();
@@ -43,9 +73,13 @@ export function BookCover({
           // Try ISBN first
           if (book.isbn && book.isbn.length > 0) {
             const isbnUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn[0]}-L.jpg`;
-            const isbnResponse = await fetch(isbnUrl);
+            const isbnResponse = await fetch(isbnUrl, {
+              signal: abortControllerRef.current.signal,
+              method: 'HEAD'
+            });
             if (isbnResponse.ok && isbnResponse.headers.get('content-type')?.includes('image')) {
               setCoverUrl(isbnUrl);
+              coverUrlCache.set(cacheKey, isbnUrl);
               setIsLoading(false);
               return;
             }
@@ -55,9 +89,13 @@ export function BookCover({
           if (book.key) {
             const olid = book.key.split('/')[2];
             const olidUrl = `https://covers.openlibrary.org/b/olid/${olid}-L.jpg`;
-            const olidResponse = await fetch(olidUrl);
+            const olidResponse = await fetch(olidUrl, {
+              signal: abortControllerRef.current.signal,
+              method: 'HEAD'
+            });
             if (olidResponse.ok && olidResponse.headers.get('content-type')?.includes('image')) {
               setCoverUrl(olidUrl);
+              coverUrlCache.set(cacheKey, olidUrl);
               setIsLoading(false);
               return;
             }
@@ -66,7 +104,9 @@ export function BookCover({
         
         // Fallback to Google Books API
         const googleUrl = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}+inauthor:${encodeURIComponent(author)}&maxResults=1`;
-        const googleResponse = await fetch(googleUrl);
+        const googleResponse = await fetch(googleUrl, {
+          signal: abortControllerRef.current.signal
+        });
         if (!googleResponse.ok) throw new Error('Failed to fetch from Google Books');
         
         const googleData = await googleResponse.json();
@@ -76,16 +116,31 @@ export function BookCover({
             .replace('http://', 'https://')
             .replace('zoom=1', 'zoom=2');
           setCoverUrl(googleCoverUrl);
+          coverUrlCache.set(cacheKey, googleCoverUrl);
           setIsLoading(false);
           return;
         }
         
         throw new Error('No cover found');
-      } catch (error) {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Cover fetch aborted:', title);
+          return;
+        }
+        
         console.error('Error fetching book cover:', error);
         if (retryCount < 2) {
           setRetryCount(prev => prev + 1);
-          setTimeout(() => fetchCoverUrl(), 1000 * (retryCount + 1));
+          // Clear any existing timeout
+          if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+          }
+          // Set new timeout for retry
+          fetchTimeoutRef.current = setTimeout(() => {
+            if (!abortControllerRef.current?.signal.aborted) {
+              fetchCoverUrl();
+            }
+          }, 1000 * (retryCount + 1));
         } else {
           setImageError(true);
           setIsLoading(false);
@@ -93,7 +148,17 @@ export function BookCover({
       }
     };
     
-    fetchCoverUrl();
+    // Debounce the fetch
+    const timeoutId = setTimeout(() => {
+      fetchCoverUrl();
+    }, 100);
+
+    // Cleanup function
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, [title, author, retryCount]);
   
   // Fallback cover with title and author
