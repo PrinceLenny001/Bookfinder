@@ -12,3 +12,6 @@ export const appRouter = createTRPCRouter({
 
 // export type definition of API
 export type AppRouter = typeof appRouter;
+
+// Export a caller creator for use in RSC
+export const createCaller = appRouter.createCaller;

@@ -9,8 +9,18 @@
  */
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
+import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 
-const t = initTRPC.create({
+/**
+ * Context configuration
+ */
+export const createTRPCContext = async (opts: { headers: Headers }) => {
+  return {
+    headers: opts.headers,
+  };
+};
+
+const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
 });
 
