@@ -17,6 +17,11 @@ const GENRES = [
   "Biography",
   "Sports",
   "Humor",
+  "Informational",
+  "Autobiography",
+  "Memoir",
+  "Novel in Verse",
+  "Dystopian"
 ] as const;
 
 type Genre = (typeof GENRES)[number];

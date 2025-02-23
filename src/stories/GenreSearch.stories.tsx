@@ -15,6 +15,11 @@ const GENRES = [
   "Biography",
   "Sports",
   "Humor",
+  "Informational",
+  "Autobiography",
+  "Memoir",
+  "Novel in Verse",
+  "Dystopian"
 ] as const;
 
 type Genre = (typeof GENRES)[number];
@@ -56,5 +61,23 @@ export const WithSelectedGenre: Story = {
   args: {
     selectedGenre: "Fantasy" as Genre,
     onGenreSelect: () => {},
+  },
+};
+
+export const Interactive: Story = {
+  args: {
+    selectedGenre: null,
+    onGenreSelect: () => {},
+  },
+  render: (args) => {
+    const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+    return (
+      <div className="w-[800px]">
+        <GenreSearch
+          selectedGenre={selectedGenre}
+          onGenreSelect={setSelectedGenre}
+        />
+      </div>
+    );
   },
 }; 

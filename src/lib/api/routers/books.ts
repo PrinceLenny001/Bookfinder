@@ -15,6 +15,11 @@ const GENRES = [
   "Biography",
   "Sports",
   "Humor",
+  "Informational",
+  "Autobiography",
+  "Memoir",
+  "Novel in Verse",
+  "Dystopian"
 ] as const;
 
 export const booksRouter = createTRPCRouter({
@@ -36,6 +41,11 @@ export const booksRouter = createTRPCRouter({
           "Biography",
           "Sports",
           "Humor",
+          "Informational",
+          "Autobiography",
+          "Memoir",
+          "Novel in Verse",
+          "Dystopian"
         ]).nullable(),
         title: z.string().optional(),
       })
@@ -61,6 +71,11 @@ export const booksRouter = createTRPCRouter({
           "Biography",
           "Sports",
           "Humor",
+          "Informational",
+          "Autobiography",
+          "Memoir",
+          "Novel in Verse",
+          "Dystopian"
         ]).nullable(),
       })
     )

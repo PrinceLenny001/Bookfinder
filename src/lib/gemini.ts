@@ -7,6 +7,70 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+// Rate limiting setup
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 60; // 60 requests per minute
+let requestCount = 0;
+let windowStart = Date.now();
+
+// Queue for pending requests
+const requestQueue: (() => void)[] = [];
+let isProcessingQueue = false;
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const now = Date.now();
+    if (now - windowStart >= RATE_LIMIT_WINDOW) {
+      // Reset window
+      windowStart = now;
+      requestCount = 0;
+    }
+
+    if (requestCount < MAX_REQUESTS) {
+      const nextRequest = requestQueue.shift();
+      if (nextRequest) {
+        requestCount++;
+        nextRequest();
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.ceil(RATE_LIMIT_WINDOW / MAX_REQUESTS)));
+    } else {
+      // Wait for the next window
+      await new Promise(resolve => setTimeout(resolve, windowStart + RATE_LIMIT_WINDOW - now));
+      windowStart = Date.now();
+      requestCount = 0;
+    }
+  }
+
+  isProcessingQueue = false;
+}
+
+async function makeRateLimitedRequest<T>(request: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const executeRequest = async () => {
+      try {
+        const result = await request();
+        resolve(result);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('429')) {
+          // If we get a rate limit error, wait and retry
+          console.log('Rate limit hit, retrying after delay...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          requestQueue.push(executeRequest);
+          processQueue();
+        } else {
+          reject(error);
+        }
+      }
+    };
+
+    requestQueue.push(executeRequest);
+    processQueue();
+  });
+}
+
 export interface BookRecommendation {
   title: string;
   author: string;
@@ -44,7 +108,7 @@ export async function getBookRecommendations(
     prompt += ` Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await model.generateContent(prompt);
+    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
@@ -73,8 +137,6 @@ export async function getBookRecommendations(
 }
 
 export async function getBooksByGenre(minLexile: number, maxLexile: number, genre: string): Promise<BookRecommendation[]> {
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
   const prompt = `Please recommend 5-10 ${genre} book titles suitable for middle school students with a Lexile range between ${minLexile}L and ${maxLexile}L. 
   For each book, provide the title and author. Format your response as a JSON array with objects containing 'title' and 'author' properties.
   Only include books that are appropriate for middle school students, fall within the specified Lexile range, and belong to the ${genre} genre.
@@ -87,7 +149,7 @@ export async function getBooksByGenre(minLexile: number, maxLexile: number, genr
   ]`;
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
     const response = await result.response;
     const text = response.text();
     
@@ -123,7 +185,7 @@ export async function getSimilarBooks(
     Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await model.generateContent(prompt);
+    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
@@ -159,7 +221,7 @@ export async function generateBookDescription(
     const prompt = `Write a short, engaging description of the book "${title}" by ${author} that would interest a middle school student. Keep it concise and focus on what makes the book interesting.`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await model.generateContent(prompt);
+    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
     return text.trim();
@@ -181,7 +243,7 @@ export async function getBookMetadata(
     Format example: {"ageRange": "12-14 years", "contentWarnings": ["Mild violence"], "themes": ["Adventure", "Friendship"]}`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await model.generateContent(prompt);
+    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
