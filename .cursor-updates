@@ -11,3 +11,4 @@
 - Added similar book recommendations functionality using Gemini AI
 - Added LexileRangeInput component with Storybook stories and integrated Gemini AI book recommendations
 - Removed authentication requirements and simplified app to search-only interface
+- Added integration tests for Gemini AI functions including getBookRecommendations, getSimilarBooks, generateBookDescription, and getBookMetadata with proper mocking and error handling.
