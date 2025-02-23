@@ -7,3 +7,4 @@
 - Added Storybook with Button component and stories, updated .cursorrules with Storybook guidelines
 - Captured screenshot of Button component stories in Storybook
 - Created LexileRangeInput component with TypeScript and Tailwind styling, including input validation and error handling
+- Implemented Gemini AI integration with tRPC router and book recommendations functionality

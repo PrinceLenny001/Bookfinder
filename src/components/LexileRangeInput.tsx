@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent, useEffect } from "react";
+import { api } from "@/lib/trpc/react";
+import { toast } from "react-toastify";
+import type { BookRecommendation } from "@/lib/gemini";
 
 interface LexileRangeInputProps {
-  onRangeChange: (min: number, max: number) => void;
+  onRangeChange?: (min: number, max: number) => void;
   className?: string;
 }
 
@@ -11,6 +14,23 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   const [minLexile, setMinLexile] = useState<string>("");
   const [maxLexile, setMaxLexile] = useState<string>("");
   const [error, setError] = useState<string>("");
+
+  const recommendationsQuery = api.books.getRecommendations.useQuery(
+    {
+      minLexile: parseInt(minLexile) || 0,
+      maxLexile: parseInt(maxLexile) || 0,
+    },
+    {
+      enabled: Boolean(minLexile && maxLexile && !error),
+      retry: false,
+    }
+  );
+
+  useEffect(() => {
+    if (recommendationsQuery.error) {
+      toast.error("Failed to get book recommendations: " + recommendationsQuery.error.message);
+    }
+  }, [recommendationsQuery.error]);
 
   const handleChange = (value: string, isMin: boolean) => {
     // Remove non-numeric characters except minus sign
@@ -31,7 +51,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
         setError("Minimum Lexile must be less than maximum");
       } else {
         setError("");
-        onRangeChange(min, max);
+        onRangeChange?.(min, max);
       }
     }
   };
@@ -80,6 +100,21 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       </div>
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+      {recommendationsQuery.isLoading && (
+        <p className="text-sm text-gray-600 dark:text-gray-400">Loading recommendations...</p>
+      )}
+      {recommendationsQuery.data && (
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Recommended Books</h3>
+          <ul className="space-y-2">
+            {recommendationsQuery.data.map((book: BookRecommendation, index: number) => (
+              <li key={index} className="text-sm">
+                <span className="font-medium">{book.title}</span> by {book.author}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

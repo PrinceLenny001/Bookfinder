@@ -1,4 +1,5 @@
 import { createCallerFactory, createTRPCRouter } from "./trpc";
+import { booksRouter } from "./routers/books";
 // import all routers here
 
 /**
@@ -7,6 +8,7 @@ import { createCallerFactory, createTRPCRouter } from "./trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  books: booksRouter,
   // add routers here
 });
 
