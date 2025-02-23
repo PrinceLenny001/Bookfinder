@@ -4,6 +4,7 @@ import React, { useState, ChangeEvent, useEffect } from "react";
 import { api } from "@/lib/trpc/react";
 import { toast } from "react-toastify";
 import type { BookRecommendation } from "@/lib/gemini";
+import { BookGrid } from "./BookGrid";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -14,6 +15,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   const [minLexile, setMinLexile] = useState<string>("");
   const [maxLexile, setMaxLexile] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
 
   const recommendationsQuery = api.books.getRecommendations.useQuery(
     {
@@ -56,8 +58,12 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
     }
   };
 
+  const handleBookClick = (book: BookRecommendation) => {
+    setSelectedBook(book);
+  };
+
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={`flex flex-col gap-4 ${className}`}>
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <label 
@@ -106,14 +112,12 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       )}
       {recommendationsQuery.data && (
         <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Recommended Books</h3>
-          <ul className="space-y-2">
-            {recommendationsQuery.data.map((book: BookRecommendation, index: number) => (
-              <li key={index} className="text-sm">
-                <span className="font-medium">{book.title}</span> by {book.author}
-              </li>
-            ))}
-          </ul>
+          <h3 className="text-lg font-semibold mb-4">Recommended Books</h3>
+          <BookGrid 
+            books={recommendationsQuery.data} 
+            onBookClick={handleBookClick}
+            className="mb-4"
+          />
         </div>
       )}
     </div>
