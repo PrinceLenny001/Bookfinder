@@ -7,6 +7,8 @@ import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
 import { GenreSearch } from "./GenreSearch";
 import { HelpCircle } from "lucide-react";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { ErrorMessage } from "./ErrorMessage";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -148,17 +150,17 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
       )}
 
       {recommendationsQuery.isLoading ? (
-        <div className="animate-pulse space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg" />
-            ))}
-          </div>
+        <div className="flex flex-col items-center justify-center py-8">
+          <LoadingSpinner size="lg" className="mb-4" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Finding the perfect books for you...
+          </p>
         </div>
       ) : recommendationsQuery.error ? (
-        <div className="text-red-500">
-          Error: {recommendationsQuery.error.message}
-        </div>
+        <ErrorMessage 
+          message={recommendationsQuery.error.message} 
+          className="mt-4"
+        />
       ) : recommendationsQuery.data ? (
         <>
           <h3 className="text-lg font-medium mb-4">

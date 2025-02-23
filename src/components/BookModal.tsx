@@ -5,6 +5,8 @@ import { api } from "@/lib/trpc/react";
 import { type BookRecommendation } from "@/lib/gemini";
 import { BookMetadata } from "./BookMetadata";
 import { X } from "lucide-react";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { ErrorMessage } from "./ErrorMessage";
 
 interface BookModalProps {
   book: BookRecommendation;
@@ -50,16 +52,34 @@ export function BookModal({ book, onClose }: BookModalProps) {
             <p className="text-lg mb-2">
               By <span className="font-medium">{book.author}</span>
             </p>
-            {descriptionQuery.data && (
+            {descriptionQuery.isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <LoadingSpinner size="sm" />
+              </div>
+            ) : descriptionQuery.error ? (
+              <ErrorMessage 
+                message="Failed to load book description" 
+                className="mt-2"
+              />
+            ) : descriptionQuery.data ? (
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                 {descriptionQuery.data}
               </p>
-            )}
+            ) : null}
           </div>
 
           <BookMetadata title={book.title} author={book.author} />
 
-          {similarBooksQuery.data && similarBooksQuery.data.length > 0 && (
+          {similarBooksQuery.isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <LoadingSpinner size="sm" />
+            </div>
+          ) : similarBooksQuery.error ? (
+            <ErrorMessage 
+              message="Failed to load similar books" 
+              className="mt-2"
+            />
+          ) : similarBooksQuery.data && similarBooksQuery.data.length > 0 ? (
             <div>
               <h3 className="text-lg font-medium mb-3">You Might Also Like</h3>
               <ul className="space-y-2">
@@ -71,7 +91,7 @@ export function BookModal({ book, onClose }: BookModalProps) {
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
 
           <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
             <p>
