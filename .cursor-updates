@@ -17,3 +17,4 @@
 - Added title search and Lexile range slider with middle school defaults
 - Improved Gemini AI integration with better error handling and response parsing
 - Improved main page UI with combined dual-range slider, enhanced styling, and better visual hierarchy
+- Improved book cover display with Google Books API fallback, better error handling, and added covers to book details modal
