@@ -1,24 +1,34 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { BookModal } from "@/components/BookModal";
 
-const meta: Meta<typeof BookModal> = {
+const meta = {
   title: "Components/BookModal",
   component: BookModal,
   parameters: {
     layout: "centered",
   },
   tags: ["autodocs"],
-};
+} satisfies Meta<typeof BookModal>;
 
 export default meta;
-type Story = StoryObj<typeof BookModal>;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
+  args: {
+    book: {
+      title: "The Hobbit",
+      author: "J.R.R. Tolkien",
+    },
+    onClose: () => {},
+  },
+};
 
 export const WithDescription: Story = {
   args: {
     book: {
       title: "The Hobbit",
       author: "J.R.R. Tolkien",
-      description: "In a hole in the ground there lived a hobbit. Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell, nor yet a dry, bare, sandy hole with nothing in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.",
+      description: "A fantasy novel about a hobbit who goes on an unexpected journey.",
     },
     onClose: () => {},
   },
