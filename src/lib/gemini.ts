@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("Missing GEMINI_API_KEY environment variable");
-}
+// Only initialize Gemini if API key is present
+const genAI = process.env.GEMINI_API_KEY 
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI?.getGenerativeModel({ model: "gemini-pro" });
 
 // Rate limiting setup
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -85,6 +85,10 @@ async function processQueue() {
 }
 
 async function makeRateLimitedRequest<T>(request: () => Promise<T>, cacheKey?: string): Promise<T> {
+  if (!model) {
+    throw new Error("Gemini API is not configured. Please check your environment variables.");
+  }
+
   // Check cache first if cacheKey is provided
   if (cacheKey) {
     const cachedResult = requestCache.get<T>(cacheKey);
@@ -139,6 +143,11 @@ export async function getBookRecommendations(
   genre: string | null = null,
   title: string | undefined = undefined
 ): Promise<BookRecommendation[]> {
+  if (!model) {
+    console.error("Gemini API is not configured");
+    return [];
+  }
+
   try {
     // Create a cache key based on the parameters
     const cacheKey = `recommendations:${minLexile}:${maxLexile}:${genre}:${title}`;
@@ -192,6 +201,11 @@ export async function getBookRecommendations(
 }
 
 export async function getBooksByGenre(minLexile: number, maxLexile: number, genre: string): Promise<BookRecommendation[]> {
+  if (!model) {
+    console.error("Gemini API is not configured");
+    return [];
+  }
+
   const prompt = `Please recommend 5-10 ${genre} book titles suitable for middle school students with a Lexile range between ${minLexile}L and ${maxLexile}L. 
   For each book, provide the title and author. Format your response as a JSON array with objects containing 'title' and 'author' properties.
   Only include books that are appropriate for middle school students, fall within the specified Lexile range, and belong to the ${genre} genre.
@@ -226,6 +240,11 @@ export async function getSimilarBooks(
   bookTitle: string,
   genre: string | null = null
 ): Promise<BookRecommendation[]> {
+  if (!model) {
+    console.error("Gemini API is not configured");
+    return [];
+  }
+
   try {
     const cacheKey = `similar:${bookTitle}:${genre}`;
     let prompt = `Recommend 5 books that are very similar to "${bookTitle}"`;
@@ -276,6 +295,11 @@ export async function generateBookDescription(
   title: string,
   author: string
 ): Promise<string> {
+  if (!model) {
+    console.error("Gemini API is not configured");
+    return "Description not available";
+  }
+
   try {
     const cacheKey = `description:${title}:${author}`;
     const prompt = `Write a short, engaging description of the book "${title}" by ${author} that would interest a middle school student. Keep it concise and focus on what makes the book interesting.`;
@@ -298,6 +322,16 @@ export async function getBookMetadata(
   title: string,
   author: string
 ): Promise<BookMetadata> {
+  if (!model) {
+    console.error("Gemini API is not configured");
+    return {
+      ageRange: "Not available",
+      contentWarnings: [],
+      themes: [],
+      lexileScore: undefined,
+    };
+  }
+
   try {
     const cacheKey = `metadata:${title}:${author}`;
     const prompt = `For the book "${title}" by ${author}, provide the following metadata in JSON format:

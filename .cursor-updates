@@ -25,3 +25,4 @@
 - Added bookshelf feature for saving books and direct Lexile input fields alongside the slider
 - Fixed bookshelf visibility and bookmark state synchronization across components
 - Added Lexile score display to book cards, modal, and bookshelf
+- Improved Gemini API error handling for missing API key and better build compatibility
