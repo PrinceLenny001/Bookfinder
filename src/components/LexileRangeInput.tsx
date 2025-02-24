@@ -70,17 +70,21 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
 
   const handleRangeChange = (e: ChangeEvent<HTMLInputElement>, isMin: boolean) => {
     const value = parseInt(e.target.value);
+    
     if (isMin) {
-      setMinLexile(Math.min(value, maxLexile - 100));
+      // When moving min slider, ensure it stays at least 100 below max
+      const newMin = Math.max(MIN_LEXILE, Math.min(value, maxLexile - 100));
+      setMinLexile(newMin);
+      if (onRangeChange) {
+        onRangeChange(newMin, maxLexile);
+      }
     } else {
-      setMaxLexile(Math.max(value, minLexile + 100));
-    }
-
-    if (onRangeChange) {
-      onRangeChange(
-        isMin ? value : minLexile,
-        isMin ? maxLexile : value
-      );
+      // When moving max slider, ensure it stays at least 100 above min
+      const newMax = Math.min(MAX_LEXILE, Math.max(value, minLexile + 100));
+      setMaxLexile(newMax);
+      if (onRangeChange) {
+        onRangeChange(minLexile, newMax);
+      }
     }
   };
 
@@ -89,12 +93,14 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
     if (isNaN(numValue)) return;
 
     if (isMin) {
+      // When setting min value, ensure it stays at least 100 below max
       const newMin = Math.max(MIN_LEXILE, Math.min(numValue, maxLexile - 100));
       setMinLexile(newMin);
       if (onRangeChange) {
         onRangeChange(newMin, maxLexile);
       }
     } else {
+      // When setting max value, ensure it stays at least 100 above min
       const newMax = Math.min(MAX_LEXILE, Math.max(numValue, minLexile + 100));
       setMaxLexile(newMax);
       if (onRangeChange) {
@@ -229,7 +235,9 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                 max={MAX_LEXILE}
                 value={minLexile}
                 onChange={(e) => handleRangeChange(e, true)}
-                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer 
+                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer z-20
+                  pointer-events-none
+                  [&::-webkit-slider-thumb]:pointer-events-auto
                   [&::-webkit-slider-thumb]:w-6 
                   [&::-webkit-slider-thumb]:h-6 
                   [&::-webkit-slider-thumb]:rounded-full 
@@ -242,6 +250,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                   [&::-webkit-slider-thumb]:duration-200 
                   [&::-webkit-slider-thumb]:hover:scale-110
                   [&::-webkit-slider-thumb]:hover:border-indigo-500
+                  [&::-moz-range-thumb]:pointer-events-auto
                   [&::-moz-range-thumb]:w-6 
                   [&::-moz-range-thumb]:h-6 
                   [&::-moz-range-thumb]:rounded-full 
@@ -260,7 +269,9 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                 max={MAX_LEXILE}
                 value={maxLexile}
                 onChange={(e) => handleRangeChange(e, false)}
-                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer 
+                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer z-20
+                  pointer-events-none
+                  [&::-webkit-slider-thumb]:pointer-events-auto
                   [&::-webkit-slider-thumb]:w-6 
                   [&::-webkit-slider-thumb]:h-6 
                   [&::-webkit-slider-thumb]:rounded-full 
@@ -273,6 +284,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                   [&::-webkit-slider-thumb]:duration-200 
                   [&::-webkit-slider-thumb]:hover:scale-110
                   [&::-webkit-slider-thumb]:hover:border-indigo-500
+                  [&::-moz-range-thumb]:pointer-events-auto
                   [&::-moz-range-thumb]:w-6 
                   [&::-moz-range-thumb]:h-6 
                   [&::-moz-range-thumb]:rounded-full 
