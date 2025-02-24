@@ -3,13 +3,15 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
+import { type Book } from "@/lib/db/books";
 
 // Cache for cover URLs to avoid refetching
 const coverUrlCache = new Map<string, string>();
 
 interface BookCoverProps {
-  title: string;
-  author: string;
+  title?: string;
+  author?: string;
+  book?: Book;
   onClick?: () => void;
   className?: string;
   priority?: boolean;
@@ -18,14 +20,22 @@ interface BookCoverProps {
 export function BookCover({ 
   title, 
   author, 
+  book, 
   onClick, 
   className = "",
   priority = false 
 }: BookCoverProps) {
+  const coverTitle = book?.title || title;
+  const coverAuthor = book?.author || author;
+
+  if (!coverTitle || !coverAuthor) {
+    return null;
+  }
+
   const [imageError, setImageError] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(() => {
     // Check cache on initial render
-    const cacheKey = `${title}-${author}`;
+    const cacheKey = `${coverTitle}-${coverAuthor}`;
     return coverUrlCache.get(cacheKey) || null;
   });
   const [isLoading, setIsLoading] = useState(!coverUrl);
@@ -34,7 +44,7 @@ export function BookCover({
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    const cacheKey = `${title}-${author}`;
+    const cacheKey = `${coverTitle}-${coverAuthor}`;
     
     // If we have a cached URL, use it
     const cachedUrl = coverUrlCache.get(cacheKey);
@@ -58,7 +68,7 @@ export function BookCover({
         setImageError(false);
         
         // Try to get OLID first
-        const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`;
+        const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(coverTitle)}&author=${encodeURIComponent(coverAuthor)}&limit=1`;
         const response = await fetch(searchUrl, {
           signal: abortControllerRef.current.signal,
           headers: { 'Accept': 'application/json' }
@@ -103,7 +113,7 @@ export function BookCover({
         }
         
         // Fallback to Google Books API
-        const googleUrl = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}+inauthor:${encodeURIComponent(author)}&maxResults=1`;
+        const googleUrl = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(coverTitle)}+inauthor:${encodeURIComponent(coverAuthor)}&maxResults=1`;
         const googleResponse = await fetch(googleUrl, {
           signal: abortControllerRef.current.signal
         });
@@ -124,7 +134,7 @@ export function BookCover({
         throw new Error('No cover found');
       } catch (error: unknown) {
         if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Cover fetch aborted:', title);
+          console.log('Cover fetch aborted:', coverTitle);
           return;
         }
         
@@ -159,7 +169,7 @@ export function BookCover({
       if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [title, author, retryCount]);
+  }, [coverTitle, coverAuthor, retryCount]);
   
   // Fallback cover with title and author
   const FallbackCover = () => (
@@ -174,8 +184,8 @@ export function BookCover({
       "
       onClick={onClick}
     >
-      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-3">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{author}</p>
+      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-3">{coverTitle}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{coverAuthor}</p>
     </div>
   );
 
@@ -219,7 +229,7 @@ export function BookCover({
     >
       <Image
         src={coverUrl}
-        alt={`Cover of ${title} by ${author}`}
+        alt={`Cover of ${coverTitle} by ${coverAuthor}`}
         fill
         priority={priority}
         className="

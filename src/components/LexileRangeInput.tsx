@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent, useEffect, useCallback } from "react";
 import { api } from "@/lib/trpc/react";
-import { type BookRecommendation } from "@/lib/gemini";
+import { type Book } from "@/lib/db/books";
 import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
 import { GenreSearch } from "./GenreSearch";
@@ -62,7 +62,7 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   const [maxLexile, setMaxLexile] = useState(DEFAULT_MAX_LEXILE);
   const [searchTitle, setSearchTitle] = useState("");
   const [error, setError] = useState<string>("");
-  const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [debouncedMinLexile, setDebouncedMinLexile] = useState(DEFAULT_MIN_LEXILE);

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { publicProcedure, createTRPCRouter } from "../trpc";
 import { getBookRecommendations, getSimilarBooks, generateBookDescription, getBookMetadata, getBooksByGenre } from "../../gemini";
+import { getBooksByLexileRange } from "@/lib/db/books";
+import { prisma } from "@/lib/db";
 
 const GENRES = [
   "Fantasy",
@@ -28,59 +30,47 @@ export const booksRouter = createTRPCRouter({
       z.object({
         minLexile: z.number(),
         maxLexile: z.number(),
-        genre: z.enum([
-          "Fantasy",
-          "Science Fiction",
-          "Mystery",
-          "Adventure",
-          "Realistic Fiction",
-          "Historical Fiction",
-          "Graphic Novels",
-          "Horror",
-          "Poetry",
-          "Biography",
-          "Sports",
-          "Humor",
-          "Informational",
-          "Autobiography",
-          "Memoir",
-          "Novel in Verse",
-          "Dystopian"
-        ]).nullable(),
+        genre: z.string().nullable(),
         title: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
-      return getBookRecommendations(input.minLexile, input.maxLexile, input.genre, input.title);
+      const { minLexile, maxLexile, genre, title } = input;
+      return getBooksByLexileRange(minLexile, maxLexile, genre, title);
     }),
   
   getSimilarBooks: publicProcedure
     .input(
       z.object({
-        bookTitle: z.string(),
-        genre: z.enum([
-          "Fantasy",
-          "Science Fiction",
-          "Mystery",
-          "Adventure",
-          "Realistic Fiction",
-          "Historical Fiction",
-          "Graphic Novels",
-          "Horror",
-          "Poetry",
-          "Biography",
-          "Sports",
-          "Humor",
-          "Informational",
-          "Autobiography",
-          "Memoir",
-          "Novel in Verse",
-          "Dystopian"
-        ]).nullable(),
+        title: z.string(),
+        author: z.string(),
+        lexileScore: z.number(),
       })
     )
     .query(async ({ input }) => {
-      return getSimilarBooks(input.bookTitle, input.genre);
+      const { lexileScore } = input;
+      
+      // Find books with similar Lexile scores (within 100 points)
+      const similarBooks = await prisma.book.findMany({
+        where: {
+          lexileScore: {
+            gte: lexileScore - 100,
+            lte: lexileScore + 100,
+          },
+          NOT: {
+            AND: [
+              { title: input.title },
+              { author: input.author }
+            ]
+          }
+        },
+        take: 5,
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      return similarBooks;
     }),
 
   generateDescription: publicProcedure

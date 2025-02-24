@@ -8,16 +8,19 @@ import { X, Bookmark, BookmarkCheck } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorMessage } from "./ErrorMessage";
 import { BookCover } from "./BookCover";
+import { type Book } from "@/lib/db/books";
 
 interface BookModalProps {
-  book: BookRecommendation;
+  book: Book | null;
   onClose: () => void;
 }
 
-export function BookModal({ book: initialBook, onClose }: BookModalProps) {
-  const [currentBook, setCurrentBook] = useState<BookRecommendation>(initialBook);
-  const [bookHistory, setBookHistory] = useState<BookRecommendation[]>([initialBook]);
+export function BookModal({ book, onClose }: BookModalProps) {
+  const [currentBook, setCurrentBook] = useState<Book | null>(book);
+  const [bookHistory, setBookHistory] = useState<Book[]>(book ? [book] : []);
   const [isBookmarked, setIsBookmarked] = useState(false);
+
+  if (!book || !currentBook) return null;
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -42,9 +45,10 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
   }, [currentBook]);
 
   const similarBooksQuery = api.books.getSimilarBooks.useQuery(
-    { 
-      bookTitle: currentBook.title,
-      genre: null
+    {
+      title: currentBook.title,
+      author: currentBook.author,
+      lexileScore: currentBook.lexileScore
     },
     { enabled: true }
   );
@@ -59,9 +63,9 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
     { enabled: true }
   );
 
-  const handleBookClick = (book: BookRecommendation) => {
-    setBookHistory(prev => [...prev, book]);
-    setCurrentBook(book);
+  const handleBookClick = (newBook: Book) => {
+    setBookHistory(prev => [...prev, newBook]);
+    setCurrentBook(newBook);
   };
 
   const handleBack = () => {
@@ -72,25 +76,21 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
     }
   };
 
-  const toggleBookmark = () => {
-    const saved = localStorage.getItem("bookshelf");
-    let savedBooks: BookRecommendation[] = saved ? JSON.parse(saved) : [];
-
+  const handleBookmarkClick = () => {
+    setIsBookmarked(!isBookmarked);
+    const savedBooks = JSON.parse(localStorage.getItem("bookshelf") || "[]") as Book[];
+    
     if (isBookmarked) {
       // Remove from bookshelf
-      savedBooks = savedBooks.filter(
-        (b) => !(b.title === currentBook.title && b.author === currentBook.author)
+      const updatedBooks = savedBooks.filter(
+        saved => saved.title !== currentBook.title || saved.author !== currentBook.author
       );
+      localStorage.setItem("bookshelf", JSON.stringify(updatedBooks));
     } else {
       // Add to bookshelf
       savedBooks.push(currentBook);
+      localStorage.setItem("bookshelf", JSON.stringify(savedBooks));
     }
-
-    localStorage.setItem("bookshelf", JSON.stringify(savedBooks));
-    setIsBookmarked(!isBookmarked);
-
-    // Dispatch a custom event to notify Bookshelf component
-    window.dispatchEvent(new CustomEvent('bookshelfUpdate'));
   };
 
   return (
@@ -123,7 +123,7 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={toggleBookmark}
+                onClick={handleBookmarkClick}
                 className="p-2 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                 title={isBookmarked ? "Remove from bookshelf" : "Add to bookshelf"}
               >
@@ -186,10 +186,10 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
                     className="mt-2"
                   />
                 ) : similarBooksQuery.data && similarBooksQuery.data.length > 0 ? (
-                  <div>
-                    <h3 className="text-lg font-medium mb-3">You Might Also Like</h3>
-                    <ul className="space-y-2">
-                      {similarBooksQuery.data.map((similar, index) => (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-2">Similar Books</h3>
+                    <ul className="space-y-1">
+                      {similarBooksQuery.data.map((similar: Book, index: number) => (
                         <li key={index}>
                           <button
                             onClick={() => handleBookClick(similar)}
@@ -197,8 +197,8 @@ export function BookModal({ book: initialBook, onClose }: BookModalProps) {
                           >
                             <span className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
                               {similar.title}
-                            </span>{" "}
-                            by {similar.author}
+                            </span>
+                            <span className="text-gray-500 dark:text-gray-400"> by {similar.author}</span>
                           </button>
                         </li>
                       ))}

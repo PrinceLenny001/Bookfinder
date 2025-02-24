@@ -1,18 +1,18 @@
 "use client";
 
-import { type BookRecommendation } from "@/lib/gemini";
+import { type Book } from "@/lib/db/books";
 import { BookCover } from "./BookCover";
 
 interface BookGridProps {
-  books: BookRecommendation[];
-  onBookClick?: (book: BookRecommendation) => void;
+  books: Book[] | undefined;
+  onBookClick?: (book: Book) => void;
   className?: string;
 }
 
 export function BookGrid({ books, onBookClick, className = "" }: BookGridProps) {
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 ${className}`}>
-      {books.map((book) => (
+      {books?.map((book) => (
         <button
           key={`${book.title}-${book.author}`}
           onClick={() => onBookClick?.(book)}
