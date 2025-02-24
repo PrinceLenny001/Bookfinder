@@ -128,6 +128,7 @@ export interface BookRecommendation {
   title: string;
   author: string;
   description?: string;
+  lexileScore: number;
 }
 
 export interface BookMetadata {
@@ -159,20 +160,20 @@ export async function getBookRecommendations(
     
     let prompt = "";
     if (title) {
-      prompt = `Find books similar to "${title}" that MUST have Lexile scores between ${minLexile}L and ${maxLexile}L`;
+      prompt = `Find books similar to "${title}" with EXACT Lexile scores between ${minLexile}L and ${maxLexile}L`;
       if (genre) {
         prompt += ` in the ${genre} genre`;
       }
-      prompt += `. IMPORTANT: Only include books that have confirmed Lexile scores within this exact range.`;
+      prompt += `. CRITICAL: Only include books with VERIFIED Lexile scores within this EXACT range. Do not include books outside this range.`;
     } else {
-      prompt = `Recommend 5-10 books that MUST have Lexile scores between ${minLexile}L and ${maxLexile}L`;
+      prompt = `Recommend 5-10 books with EXACT Lexile scores between ${minLexile}L and ${maxLexile}L`;
       if (genre) {
         prompt += ` in the ${genre} genre`;
       }
-      prompt += `. IMPORTANT: Only include books that have confirmed Lexile scores within this exact range.`;
+      prompt += `. CRITICAL: Only include books with VERIFIED Lexile scores within this EXACT range. Do not include books outside this range.`;
     }
     
-    prompt += ` Format the response as a JSON array of objects, each with 'title', 'author', and 'lexileScore' properties. Example format: [{"title": "Book Title", "author": "Author Name", "lexileScore": 950}]`;
+    prompt += ` Format as JSON array: [{"title": "Book Title", "author": "Author Name", "lexileScore": 950}]. The lexileScore MUST be between ${minLexile} and ${maxLexile}.`;
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await makeRateLimitedRequest(
@@ -190,20 +191,30 @@ export async function getBookRecommendations(
     }
 
     try {
-      const books = JSON.parse(jsonMatch[0]) as (BookRecommendation & { lexileScore?: number })[];
+      const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
       if (!Array.isArray(books) || !books.length) {
         console.error("Parsed response is not a valid array of books");
         return [];
       }
 
-      // Filter books by Lexile range
-      const filteredBooks = books.filter(book => isInLexileRange(book.lexileScore, minLexile, maxLexile));
+      // Strict filtering of books by Lexile range
+      const filteredBooks = books.filter(book => {
+        const isInRange = book.lexileScore >= minLexile && book.lexileScore <= maxLexile;
+        if (!isInRange) {
+          console.log(`Filtering out book "${book.title}" with Lexile score ${book.lexileScore} (outside range ${minLexile}-${maxLexile})`);
+        }
+        return isInRange;
+      });
       
       // If we have too few books after filtering, make another request
       if (filteredBooks.length < 5) {
         console.log("Too few books in range, requesting more...");
         const moreBooks = await getBookRecommendations(minLexile, maxLexile, genre, title);
-        return [...new Set([...filteredBooks, ...moreBooks])];
+        const combinedBooks = [...filteredBooks, ...moreBooks];
+        // Remove duplicates based on title and author
+        return Array.from(new Set(combinedBooks.map(book => JSON.stringify({title: book.title, author: book.author}))))
+          .map(str => JSON.parse(str))
+          .map(({title, author}) => combinedBooks.find(book => book.title === title && book.author === author)!);
       }
 
       return filteredBooks;

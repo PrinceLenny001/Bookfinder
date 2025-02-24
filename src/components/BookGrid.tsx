@@ -2,7 +2,6 @@
 
 import { type BookRecommendation } from "@/lib/gemini";
 import { BookCover } from "./BookCover";
-import { api } from "@/lib/trpc/react";
 
 interface BookGridProps {
   books: BookRecommendation[];
@@ -11,18 +10,9 @@ interface BookGridProps {
 }
 
 export function BookGrid({ books, onBookClick, className = "" }: BookGridProps) {
-  const bookMetadataQueries = api.useQueries(router => 
-    books.map(book => 
-      router.books.getMetadata({
-        title: book.title,
-        author: book.author,
-      })
-    )
-  );
-
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 ${className}`}>
-      {books.map((book, index) => (
+      {books.map((book) => (
         <button
           key={`${book.title}-${book.author}`}
           onClick={() => onBookClick?.(book)}
@@ -43,11 +33,9 @@ export function BookGrid({ books, onBookClick, className = "" }: BookGridProps) 
               <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
                 {book.author}
               </p>
-              {bookMetadataQueries[index]?.data?.lexileScore && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                  {bookMetadataQueries[index].data.lexileScore}L
-                </span>
-              )}
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {book.lexileScore}L
+              </span>
             </div>
           </div>
         </button>
