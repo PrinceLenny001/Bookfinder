@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, useEffect } from "react";
+import { useState, type ChangeEvent, useEffect, useCallback } from "react";
 import { api } from "@/lib/trpc/react";
 import { type BookRecommendation } from "@/lib/gemini";
 import { BookGrid } from "./BookGrid";
@@ -10,6 +10,7 @@ import { HelpCircle, Search, BookOpen } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorMessage } from "./ErrorMessage";
 import { TRPCClientError } from '@trpc/client';
+import { Bookshelf } from "./Bookshelf";
 
 interface LexileRangeInputProps {
   onRangeChange?: (min: number, max: number) => void;
@@ -44,6 +45,18 @@ const DEFAULT_MAX_LEXILE = 1000;
 const MIN_LEXILE = 0;
 const MAX_LEXILE = 1500;
 
+// Debounce helper
+function debounce<T extends (...args: any[]) => void>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeInputProps) {
   const [minLexile, setMinLexile] = useState(DEFAULT_MIN_LEXILE);
   const [maxLexile, setMaxLexile] = useState(DEFAULT_MAX_LEXILE);
@@ -52,6 +65,8 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   const [selectedBook, setSelectedBook] = useState<BookRecommendation | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [debouncedMinLexile, setDebouncedMinLexile] = useState(DEFAULT_MIN_LEXILE);
+  const [debouncedMaxLexile, setDebouncedMaxLexile] = useState(DEFAULT_MAX_LEXILE);
 
   const handleRangeChange = (e: ChangeEvent<HTMLInputElement>, isMin: boolean) => {
     const value = parseInt(e.target.value);
@@ -69,15 +84,45 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
     }
   };
 
+  const handleDirectInput = (value: string, isMin: boolean) => {
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) return;
+
+    if (isMin) {
+      const newMin = Math.max(MIN_LEXILE, Math.min(numValue, maxLexile - 100));
+      setMinLexile(newMin);
+      if (onRangeChange) {
+        onRangeChange(newMin, maxLexile);
+      }
+    } else {
+      const newMax = Math.min(MAX_LEXILE, Math.max(numValue, minLexile + 100));
+      setMaxLexile(newMax);
+      if (onRangeChange) {
+        onRangeChange(minLexile, newMax);
+      }
+    }
+  };
+
+  // Debounced updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMinLexile(minLexile);
+      setDebouncedMaxLexile(maxLexile);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [minLexile, maxLexile]);
+
+  // Use debounced values for API calls
   const recommendationsQuery = api.books.getRecommendations.useQuery(
     {
-      minLexile,
-      maxLexile,
+      minLexile: debouncedMinLexile,
+      maxLexile: debouncedMaxLexile,
       genre: selectedGenre,
       title: searchTitle.trim() || undefined,
     },
     {
-      enabled: Boolean((minLexile && maxLexile && !error) || searchTitle.trim()),
+      enabled: Boolean((debouncedMinLexile && debouncedMaxLexile && !error) || searchTitle.trim()),
       retry: 2,
       retryDelay: 1000,
     }
@@ -119,6 +164,8 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
         )}
       </div>
 
+      <Bookshelf className="mb-4" />
+
       <div className="space-y-6">
         <div className="relative">
           <input
@@ -136,17 +183,41 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
 
         <div className="space-y-4 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-4">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
                 Lexile Range
               </label>
-              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                {minLexile}L - {maxLexile}L
-              </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={minLexile}
+                    onChange={(e) => handleDirectInput(e.target.value, true)}
+                    className="w-20 px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    min={MIN_LEXILE}
+                    max={maxLexile - 100}
+                    step={10}
+                  />
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">L</span>
+                </div>
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">to</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={maxLexile}
+                    onChange={(e) => handleDirectInput(e.target.value, false)}
+                    className="w-20 px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    min={minLexile + 100}
+                    max={MAX_LEXILE}
+                    step={10}
+                  />
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">L</span>
+                </div>
+              </div>
             </div>
-            <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+            <div className="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full">
               <div
-                className="absolute h-full bg-blue-500 dark:bg-blue-600 rounded-full"
+                className="absolute h-full bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-600 dark:to-indigo-600 rounded-full transition-all duration-200 ease-out"
                 style={{
                   left: `${(minLexile / MAX_LEXILE) * 100}%`,
                   right: `${100 - (maxLexile / MAX_LEXILE) * 100}%`,
@@ -158,7 +229,30 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                 max={MAX_LEXILE}
                 value={minLexile}
                 onChange={(e) => handleRangeChange(e, true)}
-                className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500"
+                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer 
+                  [&::-webkit-slider-thumb]:w-6 
+                  [&::-webkit-slider-thumb]:h-6 
+                  [&::-webkit-slider-thumb]:rounded-full 
+                  [&::-webkit-slider-thumb]:bg-white 
+                  [&::-webkit-slider-thumb]:border-2 
+                  [&::-webkit-slider-thumb]:border-blue-500 
+                  [&::-webkit-slider-thumb]:shadow-lg 
+                  [&::-webkit-slider-thumb]:appearance-none 
+                  [&::-webkit-slider-thumb]:transition-transform 
+                  [&::-webkit-slider-thumb]:duration-200 
+                  [&::-webkit-slider-thumb]:hover:scale-110
+                  [&::-webkit-slider-thumb]:hover:border-indigo-500
+                  [&::-moz-range-thumb]:w-6 
+                  [&::-moz-range-thumb]:h-6 
+                  [&::-moz-range-thumb]:rounded-full 
+                  [&::-moz-range-thumb]:bg-white 
+                  [&::-moz-range-thumb]:border-2 
+                  [&::-moz-range-thumb]:border-blue-500 
+                  [&::-moz-range-thumb]:shadow-lg
+                  [&::-moz-range-thumb]:transition-transform
+                  [&::-moz-range-thumb]:duration-200
+                  [&::-moz-range-thumb]:hover:scale-110
+                  [&::-moz-range-thumb]:hover:border-indigo-500"
               />
               <input
                 type="range"
@@ -166,12 +260,35 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
                 max={MAX_LEXILE}
                 value={maxLexile}
                 onChange={(e) => handleRangeChange(e, false)}
-                className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500"
+                className="absolute w-full h-4 bg-transparent appearance-none cursor-pointer 
+                  [&::-webkit-slider-thumb]:w-6 
+                  [&::-webkit-slider-thumb]:h-6 
+                  [&::-webkit-slider-thumb]:rounded-full 
+                  [&::-webkit-slider-thumb]:bg-white 
+                  [&::-webkit-slider-thumb]:border-2 
+                  [&::-webkit-slider-thumb]:border-blue-500 
+                  [&::-webkit-slider-thumb]:shadow-lg 
+                  [&::-webkit-slider-thumb]:appearance-none 
+                  [&::-webkit-slider-thumb]:transition-transform 
+                  [&::-webkit-slider-thumb]:duration-200 
+                  [&::-webkit-slider-thumb]:hover:scale-110
+                  [&::-webkit-slider-thumb]:hover:border-indigo-500
+                  [&::-moz-range-thumb]:w-6 
+                  [&::-moz-range-thumb]:h-6 
+                  [&::-moz-range-thumb]:rounded-full 
+                  [&::-moz-range-thumb]:bg-white 
+                  [&::-moz-range-thumb]:border-2 
+                  [&::-moz-range-thumb]:border-blue-500 
+                  [&::-moz-range-thumb]:shadow-lg
+                  [&::-moz-range-thumb]:transition-transform
+                  [&::-moz-range-thumb]:duration-200
+                  [&::-moz-range-thumb]:hover:scale-110
+                  [&::-moz-range-thumb]:hover:border-indigo-500"
               />
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-gray-500 dark:text-gray-400">{MIN_LEXILE}L</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{MAX_LEXILE}L</span>
+            <div className="flex justify-between mt-2">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{MIN_LEXILE}L</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{MAX_LEXILE}L</span>
             </div>
           </div>
         </div>

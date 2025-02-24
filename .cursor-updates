@@ -21,3 +21,7 @@
 - Enhanced book cover fetching with caching, debouncing, and improved error handling, and updated similar books to match age range and content
 - Added new genres (Informational, Autobiography, Memoir, Novel in Verse, Dystopian) and implemented rate limiting for Gemini API calls
 - Added new genres (Informational, Autobiography, Memoir, Novel in Verse, Dystopian) and fixed related type errors in components and stories
+- Optimized Gemini API requests with caching and debouncing, enhanced slider UI with better visuals and interactions
+- Added bookshelf feature for saving books and direct Lexile input fields alongside the slider
+- Fixed bookshelf visibility and bookmark state synchronization across components
+- Added Lexile score display to book cards, modal, and bookshelf

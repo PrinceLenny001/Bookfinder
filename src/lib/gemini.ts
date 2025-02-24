@@ -17,6 +17,43 @@ let windowStart = Date.now();
 const requestQueue: (() => void)[] = [];
 let isProcessingQueue = false;
 
+// Cache implementation
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+class RequestCache {
+  private cache: Map<string, CacheEntry<any>> = new Map();
+
+  set<T>(key: string, data: T): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() - entry.timestamp > CACHE_DURATION) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data as T;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+const requestCache = new RequestCache();
+
 async function processQueue() {
   if (isProcessingQueue) return;
   isProcessingQueue = true;
@@ -47,15 +84,27 @@ async function processQueue() {
   isProcessingQueue = false;
 }
 
-async function makeRateLimitedRequest<T>(request: () => Promise<T>): Promise<T> {
+async function makeRateLimitedRequest<T>(request: () => Promise<T>, cacheKey?: string): Promise<T> {
+  // Check cache first if cacheKey is provided
+  if (cacheKey) {
+    const cachedResult = requestCache.get<T>(cacheKey);
+    if (cachedResult) {
+      console.log('Using cached result for:', cacheKey);
+      return cachedResult;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const executeRequest = async () => {
       try {
         const result = await request();
+        // Cache the result if cacheKey is provided
+        if (cacheKey) {
+          requestCache.set(cacheKey, result);
+        }
         resolve(result);
       } catch (error) {
         if (error instanceof Error && error.message.includes('429')) {
-          // If we get a rate limit error, wait and retry
           console.log('Rate limit hit, retrying after delay...');
           await new Promise(resolve => setTimeout(resolve, 2000));
           requestQueue.push(executeRequest);
@@ -81,6 +130,7 @@ export interface BookMetadata {
   ageRange: string;
   contentWarnings: string[];
   themes: string[];
+  lexileScore?: number;
 }
 
 export async function getBookRecommendations(
@@ -90,8 +140,10 @@ export async function getBookRecommendations(
   title: string | undefined = undefined
 ): Promise<BookRecommendation[]> {
   try {
-    let prompt = "";
+    // Create a cache key based on the parameters
+    const cacheKey = `recommendations:${minLexile}:${maxLexile}:${genre}:${title}`;
     
+    let prompt = "";
     if (title) {
       prompt = `Find books similar to "${title}"`;
       if (genre) {
@@ -108,7 +160,10 @@ export async function getBookRecommendations(
     prompt += ` Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
+    const result = await makeRateLimitedRequest(
+      () => model.generateContent(prompt),
+      cacheKey
+    );
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
@@ -172,6 +227,7 @@ export async function getSimilarBooks(
   genre: string | null = null
 ): Promise<BookRecommendation[]> {
   try {
+    const cacheKey = `similar:${bookTitle}:${genre}`;
     let prompt = `Recommend 5 books that are very similar to "${bookTitle}"`;
     if (genre) {
       prompt += ` in the ${genre} genre`;
@@ -185,7 +241,10 @@ export async function getSimilarBooks(
     Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
+    const result = await makeRateLimitedRequest(
+      () => model.generateContent(prompt),
+      cacheKey
+    );
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
@@ -218,10 +277,14 @@ export async function generateBookDescription(
   author: string
 ): Promise<string> {
   try {
+    const cacheKey = `description:${title}:${author}`;
     const prompt = `Write a short, engaging description of the book "${title}" by ${author} that would interest a middle school student. Keep it concise and focus on what makes the book interesting.`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
+    const result = await makeRateLimitedRequest(
+      () => model.generateContent(prompt),
+      cacheKey
+    );
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
     return text.trim();
@@ -236,14 +299,19 @@ export async function getBookMetadata(
   author: string
 ): Promise<BookMetadata> {
   try {
+    const cacheKey = `metadata:${title}:${author}`;
     const prompt = `For the book "${title}" by ${author}, provide the following metadata in JSON format:
     1. ageRange: A string indicating the appropriate age range (e.g., "12-14 years")
     2. contentWarnings: An array of strings for any content warnings
     3. themes: An array of main themes in the book
-    Format example: {"ageRange": "12-14 years", "contentWarnings": ["Mild violence"], "themes": ["Adventure", "Friendship"]}`;
+    4. lexileScore: A number representing the Lexile score (e.g., 800)
+    Format example: {"ageRange": "12-14 years", "contentWarnings": ["Mild violence"], "themes": ["Adventure", "Friendship"], "lexileScore": 800}`;
 
     console.log("Sending prompt to Gemini:", prompt);
-    const result = await makeRateLimitedRequest(() => model.generateContent(prompt));
+    const result = await makeRateLimitedRequest(
+      () => model.generateContent(prompt),
+      cacheKey
+    );
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
@@ -255,6 +323,7 @@ export async function getBookMetadata(
         ageRange: "Not available",
         contentWarnings: [],
         themes: [],
+        lexileScore: undefined,
       };
     }
 
@@ -267,6 +336,7 @@ export async function getBookMetadata(
         ageRange: "Not available",
         contentWarnings: [],
         themes: [],
+        lexileScore: undefined,
       };
     }
   } catch (error) {
@@ -275,6 +345,7 @@ export async function getBookMetadata(
       ageRange: "Not available",
       contentWarnings: [],
       themes: [],
+      lexileScore: undefined,
     };
   }
 } 

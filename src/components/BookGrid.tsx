@@ -1,7 +1,8 @@
 "use client";
 
+import { type BookRecommendation } from "@/lib/gemini";
 import { BookCover } from "./BookCover";
-import type { BookRecommendation } from "@/lib/gemini";
+import { api } from "@/lib/trpc/react";
 
 interface BookGridProps {
   books: BookRecommendation[];
@@ -10,28 +11,46 @@ interface BookGridProps {
 }
 
 export function BookGrid({ books, onBookClick, className = "" }: BookGridProps) {
-  if (!books?.length) {
-    return null;
-  }
+  const bookMetadataQueries = api.useQueries(router => 
+    books.map(book => 
+      router.books.getMetadata({
+        title: book.title,
+        author: book.author,
+      })
+    )
+  );
 
   return (
-    <div 
-      className={`
-        grid gap-4
-        grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5
-        auto-rows-fr
-        ${className}
-      `}
-    >
+    <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 ${className}`}>
       {books.map((book, index) => (
-        <div key={`${book.title}-${book.author}-${index}`} className="h-full">
-          <BookCover
-            title={book.title}
-            author={book.author}
-            onClick={() => onBookClick?.(book)}
-            className="h-full"
-          />
-        </div>
+        <button
+          key={`${book.title}-${book.author}`}
+          onClick={() => onBookClick?.(book)}
+          className="group relative flex flex-col items-center text-center hover:scale-105 transition-transform duration-200"
+        >
+          <div className="w-full aspect-[2/3] rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-200">
+            <BookCover 
+              title={book.title}
+              author={book.author}
+              className="w-full h-full object-cover" 
+            />
+          </div>
+          <div className="mt-2 w-full">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+              {book.title}
+            </h3>
+            <div className="flex flex-col items-center gap-1 mt-1">
+              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
+                {book.author}
+              </p>
+              {bookMetadataQueries[index]?.data?.lexileScore && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  {bookMetadataQueries[index].data.lexileScore}L
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
       ))}
     </div>
   );
