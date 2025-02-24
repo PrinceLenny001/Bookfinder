@@ -122,9 +122,9 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
   // Use debounced values for API calls
   const recommendationsQuery = api.books.getRecommendations.useQuery(
     {
-      minLexile: debouncedMinLexile,
-      maxLexile: debouncedMaxLexile,
-      genre: selectedGenre,
+      minLexile: searchTitle ? MIN_LEXILE : debouncedMinLexile,
+      maxLexile: searchTitle ? MAX_LEXILE : debouncedMaxLexile,
+      genre: searchTitle ? null : selectedGenre,
       title: searchTitle.trim() || undefined,
     },
     {

@@ -160,12 +160,14 @@ export async function getBookRecommendations(
     
     let prompt = "";
     if (title) {
-      prompt = `Find books similar to "${title}" with EXACT Lexile scores between ${minLexile}L and ${maxLexile}L`;
+      // When searching by title, focus on finding similar books without strict Lexile constraints
+      prompt = `Find books similar to or matching "${title}". Include books that are similar in theme, style, or content.`;
       if (genre) {
-        prompt += ` in the ${genre} genre`;
+        prompt += ` You may consider books from the ${genre} genre, but don't limit to it.`;
       }
-      prompt += `. CRITICAL: Only include books with VERIFIED Lexile scores within this EXACT range. Do not include books outside this range.`;
+      prompt += ` For each book, provide a Lexile score if known, but don't exclude books just because they don't match specific Lexile criteria.`;
     } else {
+      // When not searching by title, use strict Lexile range
       prompt = `Recommend 5-10 books with EXACT Lexile scores between ${minLexile}L and ${maxLexile}L`;
       if (genre) {
         prompt += ` in the ${genre} genre`;
@@ -173,7 +175,10 @@ export async function getBookRecommendations(
       prompt += `. CRITICAL: Only include books with VERIFIED Lexile scores within this EXACT range. Do not include books outside this range.`;
     }
     
-    prompt += ` Format as JSON array: [{"title": "Book Title", "author": "Author Name", "lexileScore": 950}]. The lexileScore MUST be between ${minLexile} and ${maxLexile}.`;
+    prompt += ` Format as JSON array: [{"title": "Book Title", "author": "Author Name", "lexileScore": 950}].`;
+    if (!title) {
+      prompt += ` The lexileScore MUST be between ${minLexile} and ${maxLexile}.`;
+    }
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await makeRateLimitedRequest(
@@ -197,27 +202,31 @@ export async function getBookRecommendations(
         return [];
       }
 
-      // Strict filtering of books by Lexile range
-      const filteredBooks = books.filter(book => {
-        const isInRange = book.lexileScore >= minLexile && book.lexileScore <= maxLexile;
-        if (!isInRange) {
-          console.log(`Filtering out book "${book.title}" with Lexile score ${book.lexileScore} (outside range ${minLexile}-${maxLexile})`);
+      // Only apply Lexile filtering if not searching by title
+      if (!title) {
+        const filteredBooks = books.filter(book => {
+          const isInRange = book.lexileScore >= minLexile && book.lexileScore <= maxLexile;
+          if (!isInRange) {
+            console.log(`Filtering out book "${book.title}" with Lexile score ${book.lexileScore} (outside range ${minLexile}-${maxLexile})`);
+          }
+          return isInRange;
+        });
+        
+        // If we have too few books after filtering, make another request
+        if (filteredBooks.length < 5) {
+          console.log("Too few books in range, requesting more...");
+          const moreBooks = await getBookRecommendations(minLexile, maxLexile, genre, title);
+          const combinedBooks = [...filteredBooks, ...moreBooks];
+          // Remove duplicates based on title and author
+          return Array.from(new Set(combinedBooks.map(book => JSON.stringify({title: book.title, author: book.author}))))
+            .map(str => JSON.parse(str))
+            .map(({title, author}) => combinedBooks.find(book => book.title === title && book.author === author)!);
         }
-        return isInRange;
-      });
-      
-      // If we have too few books after filtering, make another request
-      if (filteredBooks.length < 5) {
-        console.log("Too few books in range, requesting more...");
-        const moreBooks = await getBookRecommendations(minLexile, maxLexile, genre, title);
-        const combinedBooks = [...filteredBooks, ...moreBooks];
-        // Remove duplicates based on title and author
-        return Array.from(new Set(combinedBooks.map(book => JSON.stringify({title: book.title, author: book.author}))))
-          .map(str => JSON.parse(str))
-          .map(({title, author}) => combinedBooks.find(book => book.title === title && book.author === author)!);
+        return filteredBooks;
       }
 
-      return filteredBooks;
+      // For title search, return all matches without filtering
+      return books;
     } catch (parseError) {
       console.error("Failed to parse JSON response:", parseError);
       return [];
