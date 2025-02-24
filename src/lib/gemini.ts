@@ -151,84 +151,45 @@ export async function getBookRecommendations(
   title: string | undefined = undefined
 ): Promise<BookRecommendation[]> {
   if (!model) {
-    console.error("Gemini API is not configured");
+    console.error("Gemini model not configured");
     return [];
   }
 
   try {
-    const cacheKey = `recommendations:${minLexile}:${maxLexile}:${genre}:${title}`;
-    
     let prompt = "";
     if (title) {
-      // When searching by title, focus on finding similar books without strict Lexile constraints
-      prompt = `Find books similar to or matching "${title}". Include books that are similar in theme, style, or content.`;
-      if (genre) {
-        prompt += ` You may consider books from the ${genre} genre, but don't limit to it.`;
-      }
-      prompt += ` For each book, provide a Lexile score if known, but don't exclude books just because they don't match specific Lexile criteria.`;
+      prompt = `Find books similar to "${title}" for middle school students. Return 5 books in JSON format with title, author, and lexileScore. Each book should be appropriate for middle school students.`;
     } else {
-      // When not searching by title, use strict Lexile range
-      prompt = `Recommend 5-10 books with EXACT Lexile scores between ${minLexile}L and ${maxLexile}L`;
-      if (genre) {
-        prompt += ` in the ${genre} genre`;
-      }
-      prompt += `. CRITICAL: Only include books with VERIFIED Lexile scores within this EXACT range. Do not include books outside this range.`;
-    }
-    
-    prompt += ` Format as JSON array: [{"title": "Book Title", "author": "Author Name", "lexileScore": 950}].`;
-    if (!title) {
-      prompt += ` The lexileScore MUST be between ${minLexile} and ${maxLexile}.`;
+      prompt = `Recommend 5 books for middle school students with Lexile scores between ${minLexile} and ${maxLexile}${
+        genre ? ` in the ${genre} genre` : ""
+      }. Return the books in JSON format with title, author, and lexileScore.`;
     }
 
-    console.log("Sending prompt to Gemini:", prompt);
-    const result = await makeRateLimitedRequest(
-      () => model.generateContent(prompt),
-      cacheKey
-    );
-    const text = result.response.text();
-    console.log("Raw Gemini response:", text);
+    prompt += `\nFormat the response as a JSON array of objects with these exact keys: title, author, lexileScore, description.\nEnsure all lexileScore values are numbers between ${minLexile} and ${maxLexile}.\nInclude a brief description for each book.`;
 
-    // Try to extract JSON from the response
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error("Failed to extract JSON from response");
-      return [];
-    }
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
 
     try {
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("No JSON found in response");
+      }
+
       const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
-      if (!Array.isArray(books) || !books.length) {
-        console.error("Parsed response is not a valid array of books");
-        return [];
-      }
-
-      // Only apply Lexile filtering if not searching by title
-      if (!title) {
-        const filteredBooks = books.filter(book => {
-          const isInRange = book.lexileScore >= minLexile && book.lexileScore <= maxLexile;
-          if (!isInRange) {
-            console.log(`Filtering out book "${book.title}" with Lexile score ${book.lexileScore} (outside range ${minLexile}-${maxLexile})`);
-          }
-          return isInRange;
-        });
-        
-        // If we have too few books after filtering, make another request
-        if (filteredBooks.length < 5) {
-          console.log("Too few books in range, requesting more...");
-          const moreBooks = await getBookRecommendations(minLexile, maxLexile, genre, title);
-          const combinedBooks = [...filteredBooks, ...moreBooks];
-          // Remove duplicates based on title and author
-          return Array.from(new Set(combinedBooks.map(book => JSON.stringify({title: book.title, author: book.author}))))
-            .map(str => JSON.parse(str))
-            .map(({title, author}) => combinedBooks.find(book => book.title === title && book.author === author)!);
-        }
-        return filteredBooks;
-      }
-
-      // For title search, return all matches without filtering
-      return books;
-    } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError);
+      
+      // Validate the books
+      return books.filter(book => 
+        book.title &&
+        book.author &&
+        typeof book.lexileScore === "number" &&
+        book.lexileScore >= minLexile &&
+        book.lexileScore <= maxLexile
+      );
+    } catch (error) {
+      console.error("Error parsing book recommendations:", error);
       return [];
     }
   } catch (error) {

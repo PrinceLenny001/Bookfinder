@@ -4,7 +4,7 @@ import { getBookRecommendations as getGeminiBookRecommendations } from "@/lib/ge
 
 export type { Book };
 
-export async function findOrCreateBook(title: string, author: string, lexileScore: number): Promise<Book> {
+export async function findOrCreateBook(title: string, author: string, lexileScore: number, description: string | null = null): Promise<Book> {
   const existingBook = await prisma.book.findUnique({
     where: {
       title_author: {
@@ -22,7 +22,8 @@ export async function findOrCreateBook(title: string, author: string, lexileScor
     data: {
       title,
       author,
-      lexileScore
+      lexileScore,
+      description
     }
   });
 }
@@ -58,22 +59,26 @@ export async function getBooksByLexileRange(
           gte: minLexile,
           lte: maxLexile
         }
+      },
+      take: 10,
+      orderBy: {
+        createdAt: 'desc'
       }
     });
 
-    // If we found enough books in DB, return them
-    if (dbBooks.length >= 5) {
+    // If we found enough books in DB and no genre filter, return them
+    if (dbBooks.length >= 5 && !genre) {
       return dbBooks;
     }
   }
 
-  // If we don't have enough books in DB, get recommendations from Gemini
+  // If we don't have enough books in DB or have a genre filter, get recommendations from Gemini
   const geminiBooks = await getGeminiBookRecommendations(minLexile, maxLexile, genre, title);
 
   // Save new books to database
   const savedBooks = await Promise.all(
     geminiBooks.map(book => 
-      findOrCreateBook(book.title, book.author, book.lexileScore)
+      findOrCreateBook(book.title, book.author, book.lexileScore, book.description)
     )
   );
 
