@@ -129,6 +129,10 @@ export interface BookRecommendation {
   author: string;
   description?: string;
   lexileScore: number;
+  coverOptions?: {
+    description: string;
+    style: string;
+  }[];
 }
 
 export interface BookMetadata {
@@ -158,14 +162,20 @@ export async function getBookRecommendations(
   try {
     let prompt = "";
     if (title) {
-      prompt = `Find books similar to "${title}" for middle school students. Return 5 books in JSON format with title, author, and lexileScore. Each book should be appropriate for middle school students.`;
+      prompt = `Find books similar to "${title}" for middle school students. Return 5 books in JSON format with title, author, lexileScore, and coverOptions. Each book should be appropriate for middle school students.`;
     } else {
       prompt = `Recommend 5 different and varied books for middle school students with Lexile scores between ${minLexile} and ${maxLexile}${
         genre ? ` in the ${genre} genre` : ""
-      }. Try to suggest a diverse mix of books with different themes and styles. Return the books in JSON format with title, author, and lexileScore.`;
+      }. Try to suggest a diverse mix of books with different themes and styles. Return the books in JSON format with title, author, lexileScore, and coverOptions.`;
     }
 
-    prompt += `\nFormat the response as a JSON array of objects with these exact keys: title, author, lexileScore, description.\nEnsure all lexileScore values are numbers between ${minLexile} and ${maxLexile}.\nInclude a brief description for each book.\nTry to suggest books that haven't been recommended before.`;
+    prompt += `\nFormat the response as a JSON array of objects with these exact keys: title, author, lexileScore, description, coverOptions.
+    \nEnsure all lexileScore values are numbers between ${minLexile} and ${maxLexile}.
+    \nInclude a brief description for each book.
+    \nFor coverOptions, include an array of 3 different cover design descriptions, each with:
+      - description: A detailed description of what the cover looks like
+      - style: The artistic style (e.g. "watercolor", "digital art", "photography")
+    \nTry to suggest books that haven't been recommended before.`;
 
     const result = await model.generateContent(prompt);
     const response = result.response;
@@ -186,7 +196,9 @@ export async function getBookRecommendations(
         book.author &&
         typeof book.lexileScore === "number" &&
         book.lexileScore >= minLexile &&
-        book.lexileScore <= maxLexile
+        book.lexileScore <= maxLexile &&
+        Array.isArray(book.coverOptions) &&
+        book.coverOptions.length >= 1
       );
     } catch (error) {
       console.error("Error parsing book recommendations:", error);
