@@ -6,7 +6,7 @@ import { type Book } from "@/lib/db/books";
 import { BookGrid } from "./BookGrid";
 import { BookModal } from "./BookModal";
 import { GenreSearch } from "./GenreSearch";
-import { HelpCircle, Search, BookOpen } from "lucide-react";
+import { HelpCircle, Search, BookOpen, Shuffle } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ErrorMessage } from "./ErrorMessage";
 import { TRPCClientError } from '@trpc/client';
@@ -144,6 +144,11 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
 
   const shouldShowResults = recommendationsQuery.data && recommendationsQuery.data.length > 0;
   const noResultsFound = recommendationsQuery.data && recommendationsQuery.data.length === 0;
+
+  const handleShuffle = () => {
+    // Invalidate the current query to force a refetch
+    recommendationsQuery.refetch();
+  };
 
   return (
     <div className={`flex flex-col gap-6 ${className}`}>
@@ -332,10 +337,20 @@ export function LexileRangeInput({ onRangeChange, className = "" }: LexileRangeI
         />
       ) : shouldShowResults ? (
         <div className="space-y-6">
-          <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            {selectedGenre ? `${selectedGenre} Books` : searchTitle ? 'Search Results' : 'Recommended Books'} 
-            {!searchTitle && ' for Your Level'}
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              {selectedGenre ? `${selectedGenre} Books` : searchTitle ? 'Search Results' : 'Recommended Books'} 
+              {!searchTitle && ' for Your Level'}
+            </h3>
+            <button
+              onClick={handleShuffle}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              title="Get new recommendations"
+            >
+              <Shuffle className="h-4 w-4" />
+              <span>Shuffle</span>
+            </button>
+          </div>
           <BookGrid books={recommendationsQuery.data} onBookClick={setSelectedBook} />
         </div>
       ) : noResultsFound ? (

@@ -160,12 +160,12 @@ export async function getBookRecommendations(
     if (title) {
       prompt = `Find books similar to "${title}" for middle school students. Return 5 books in JSON format with title, author, and lexileScore. Each book should be appropriate for middle school students.`;
     } else {
-      prompt = `Recommend 5 books for middle school students with Lexile scores between ${minLexile} and ${maxLexile}${
+      prompt = `Recommend 5 different and varied books for middle school students with Lexile scores between ${minLexile} and ${maxLexile}${
         genre ? ` in the ${genre} genre` : ""
-      }. Return the books in JSON format with title, author, and lexileScore.`;
+      }. Try to suggest a diverse mix of books with different themes and styles. Return the books in JSON format with title, author, and lexileScore.`;
     }
 
-    prompt += `\nFormat the response as a JSON array of objects with these exact keys: title, author, lexileScore, description.\nEnsure all lexileScore values are numbers between ${minLexile} and ${maxLexile}.\nInclude a brief description for each book.`;
+    prompt += `\nFormat the response as a JSON array of objects with these exact keys: title, author, lexileScore, description.\nEnsure all lexileScore values are numbers between ${minLexile} and ${maxLexile}.\nInclude a brief description for each book.\nTry to suggest books that haven't been recommended before.`;
 
     const result = await model.generateContent(prompt);
     const response = result.response;

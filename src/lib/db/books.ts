@@ -66,9 +66,14 @@ export async function getBooksByLexileRange(
       }
     });
 
-    // If we found enough books in DB and no genre filter, return them
+    // If we found enough books in DB and no genre filter, return them in random order
     if (dbBooks.length >= 5 && !genre) {
-      return dbBooks;
+      // Shuffle the array using Fisher-Yates algorithm
+      for (let i = dbBooks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [dbBooks[i], dbBooks[j]] = [dbBooks[j], dbBooks[i]];
+      }
+      return dbBooks.slice(0, 5); // Return only 5 random books
     }
   }
 
