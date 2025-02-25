@@ -33,15 +33,18 @@ export function BookModal({ book, onClose }: BookModalProps) {
   }, [onClose]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("bookshelf");
-    if (saved) {
-      const savedBooks = JSON.parse(saved) as BookRecommendation[];
+    const checkBookmark = () => {
+      const savedBooks = JSON.parse(localStorage.getItem("bookshelf") || "[]") as Book[];
       setIsBookmarked(
         savedBooks.some(
-          (b) => b.title === currentBook.title && b.author === currentBook.author
+          saved => saved.title === currentBook.title && saved.author === currentBook.author
         )
       );
-    }
+    };
+
+    checkBookmark();
+    window.addEventListener("bookshelfUpdate", checkBookmark);
+    return () => window.removeEventListener("bookshelfUpdate", checkBookmark);
   }, [currentBook]);
 
   const similarBooksQuery = api.books.getSimilarBooks.useQuery(
@@ -77,7 +80,6 @@ export function BookModal({ book, onClose }: BookModalProps) {
   };
 
   const handleBookmarkClick = () => {
-    setIsBookmarked(!isBookmarked);
     const savedBooks = JSON.parse(localStorage.getItem("bookshelf") || "[]") as Book[];
     
     if (isBookmarked) {
@@ -91,6 +93,10 @@ export function BookModal({ book, onClose }: BookModalProps) {
       savedBooks.push(currentBook);
       localStorage.setItem("bookshelf", JSON.stringify(savedBooks));
     }
+
+    // Update bookmark state and notify other components
+    setIsBookmarked(!isBookmarked);
+    window.dispatchEvent(new CustomEvent('bookshelfUpdate'));
   };
 
   return (
