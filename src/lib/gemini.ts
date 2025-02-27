@@ -140,6 +140,7 @@ export interface BookMetadata {
   contentWarnings: string[];
   themes: string[];
   lexileScore?: number;
+  similarBooks: { title: string; author: string }[];
 }
 
 // Add new helper function for Lexile validation
@@ -278,8 +279,37 @@ export async function getSimilarBooks(
     2. Have similar themes and content
     3. Be at a similar reading level
     4. Have similar writing style and complexity
-    
-    Format the response as a JSON array of objects, each with 'title' and 'author' properties. Example format: [{"title": "Book Title", "author": "Author Name"}]`;
+
+    For each book, provide:
+    - title
+    - author
+    - lexileScore (a number between 400-1500)
+    - description (a brief 1-2 sentence description)
+    - coverOptions (an array with at least 2 different cover design options)
+
+    Each cover option should have:
+    - description: a brief description of what's on the cover
+    - style: the art style (e.g., "watercolor", "digital art", "minimalist", "gradient")
+
+    Format the response as a JSON array of objects. Example format:
+    [
+      {
+        "title": "Book Title",
+        "author": "Author Name",
+        "lexileScore": 850,
+        "description": "Brief description of the book.",
+        "coverOptions": [
+          {
+            "description": "A mountain landscape with a small figure",
+            "style": "watercolor"
+          },
+          {
+            "description": "Abstract geometric patterns in blue and green",
+            "style": "minimalist gradient"
+          }
+        ]
+      }
+    ]`;
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await makeRateLimitedRequest(
@@ -289,22 +319,22 @@ export async function getSimilarBooks(
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
-    // Try to extract JSON from the response
+    // Extract JSON from the response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error("Failed to extract JSON from response");
-      return [];
-    }
-
-    try {
-      const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
-      if (!Array.isArray(books) || !books.length) {
-        console.error("Parsed response is not a valid array of books");
+    if (jsonMatch) {
+      try {
+        const books = JSON.parse(jsonMatch[0]) as BookRecommendation[];
+        if (!Array.isArray(books) || !books.length) {
+          console.error("Parsed response is not a valid array of books");
+          return [];
+        }
+        return books;
+      } catch (parseError) {
+        console.error("Failed to parse JSON response:", parseError);
         return [];
       }
-      return books;
-    } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError);
+    } else {
+      console.error("No JSON array found in response");
       return [];
     }
   } catch (error) {
@@ -351,17 +381,33 @@ export async function getBookMetadata(
       contentWarnings: [],
       themes: [],
       lexileScore: undefined,
+      similarBooks: [],
     };
   }
 
   try {
     const cacheKey = `metadata:${title}:${author}`;
     const prompt = `For the book "${title}" by ${author}, provide the following metadata in JSON format:
+
     1. ageRange: A string indicating the appropriate age range (e.g., "12-14 years")
-    2. contentWarnings: An array of strings for any content warnings
-    3. themes: An array of main themes in the book
-    4. lexileScore: A number representing the Lexile score (e.g., 800)
-    Format example: {"ageRange": "12-14 years", "contentWarnings": ["Mild violence"], "themes": ["Adventure", "Friendship"], "lexileScore": 800}`;
+    2. contentWarnings: An array of strings for any content warnings (be specific and comprehensive)
+    3. themes: An array of main themes in the book (provide at least 3-5 themes)
+    4. lexileScore: A number representing the Lexile score if known (e.g., 800)
+    5. similarBooks: An array of 3-5 similar books with their titles and authors
+
+    Format example: 
+    {
+      "ageRange": "12-14 years", 
+      "contentWarnings": ["Mild violence", "Brief mentions of death"], 
+      "themes": ["Adventure", "Friendship", "Coming of age", "Courage", "Identity"],
+      "lexileScore": 800,
+      "similarBooks": [
+        {"title": "Similar Book 1", "author": "Author 1"},
+        {"title": "Similar Book 2", "author": "Author 2"}
+      ]
+    }
+    
+    If you don't know the exact Lexile score, provide your best estimate based on the book's complexity and target audience.`;
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await makeRateLimitedRequest(
@@ -371,28 +417,36 @@ export async function getBookMetadata(
     const text = result.response.text();
     console.log("Raw Gemini response:", text);
 
-    // Try to extract JSON from the response
+    // Extract JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("Failed to extract JSON from response");
+    if (jsonMatch) {
+      try {
+        const metadata = JSON.parse(jsonMatch[0]) as BookMetadata;
+        return {
+          ageRange: metadata.ageRange || "Not available",
+          contentWarnings: Array.isArray(metadata.contentWarnings) ? metadata.contentWarnings : [],
+          themes: Array.isArray(metadata.themes) ? metadata.themes : [],
+          lexileScore: typeof metadata.lexileScore === "number" ? metadata.lexileScore : undefined,
+          similarBooks: Array.isArray(metadata.similarBooks) ? metadata.similarBooks : [],
+        };
+      } catch (parseError) {
+        console.error("Failed to parse JSON response:", parseError);
+        return {
+          ageRange: "Not available",
+          contentWarnings: [],
+          themes: [],
+          lexileScore: undefined,
+          similarBooks: [],
+        };
+      }
+    } else {
+      console.error("No JSON object found in response");
       return {
         ageRange: "Not available",
         contentWarnings: [],
         themes: [],
         lexileScore: undefined,
-      };
-    }
-
-    try {
-      const metadata = JSON.parse(jsonMatch[0]) as BookMetadata;
-      return metadata;
-    } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError);
-      return {
-        ageRange: "Not available",
-        contentWarnings: [],
-        themes: [],
-        lexileScore: undefined,
+        similarBooks: [],
       };
     }
   } catch (error) {
@@ -402,6 +456,7 @@ export async function getBookMetadata(
       contentWarnings: [],
       themes: [],
       lexileScore: undefined,
+      similarBooks: [],
     };
   }
 } 

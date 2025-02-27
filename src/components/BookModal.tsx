@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { type Book } from "@/lib/db/books";
-import { generateBookDescription, getBookMetadata, type BookMetadata } from "@/lib/gemini";
+import { generateBookDescription, getBookMetadata, getSimilarBooks, type BookMetadata, type BookRecommendation } from "@/lib/gemini";
 import { BookCover } from "./BookCover";
 
 interface BookModalProps {
@@ -21,6 +21,7 @@ export function BookModal({
 }: BookModalProps) {
   const [description, setDescription] = useState<string | null>(book.description);
   const [metadata, setMetadata] = useState<BookMetadata | null>(null);
+  const [similarBooks, setSimilarBooks] = useState<BookRecommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCoverIndex, setSelectedCoverIndex] = useState(0);
   
@@ -43,6 +44,20 @@ export function BookModal({
         // Fetch metadata
         const bookMetadata = await getBookMetadata(book.title, book.author);
         setMetadata(bookMetadata);
+        
+        // Fetch similar books only if metadata doesn't have them
+        if (!bookMetadata.similarBooks || bookMetadata.similarBooks.length === 0) {
+          const recommendations = await getSimilarBooks(book.title);
+          setSimilarBooks(recommendations);
+        } else {
+          // Convert metadata similar books to BookRecommendation format
+          const metadataSimilarBooks: BookRecommendation[] = bookMetadata.similarBooks.map(book => ({
+            title: book.title,
+            author: book.author,
+            lexileScore: 0, // We don't have this info from metadata
+          }));
+          setSimilarBooks(metadataSimilarBooks);
+        }
       } catch (error) {
         console.error("Error fetching book details:", error);
       } finally {
@@ -219,6 +234,34 @@ export function BookModal({
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+              
+              {/* Similar Books */}
+              {similarBooks.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    Similar Books You Might Enjoy
+                  </h4>
+                  {loading ? (
+                    <div className="animate-pulse h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {similarBooks.map((similarBook, index) => (
+                        <div 
+                          key={index}
+                          className="p-2 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
+                          <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                            {similarBook.title}
+                          </h5>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            by {similarBook.author}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

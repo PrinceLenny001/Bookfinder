@@ -34,6 +34,7 @@ export function BookCover({
       
       return {
         background: `linear-gradient(to bottom right, hsl(${hue1}, 70%, 85%), hsl(${hue2}, 70%, 75%))`,
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
       };
     }
     
@@ -44,21 +45,24 @@ export function BookCover({
       background: selectedCover.style.includes('gradient') 
         ? `linear-gradient(to bottom right, ${colors[0]}, ${colors[1]})`
         : colors[0],
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
     };
   }, [title, author, coverOptions, selectedCoverIndex]);
 
   return (
     <div 
-      className={`relative w-full h-full flex items-center justify-center overflow-hidden ${className}`}
+      className={`relative w-full h-full flex items-center justify-center overflow-hidden rounded-md ${className}`}
       style={coverStyle}
     >
       <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-        <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-1 line-clamp-3">
-          {title}
-        </h3>
-        <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
-          {author}
-        </p>
+        <div className="bg-white/80 dark:bg-gray-800/80 p-2 rounded-md w-full">
+          <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-1 line-clamp-3">
+            {title}
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+            {author}
+          </p>
+        </div>
       </div>
     </div>
   );
