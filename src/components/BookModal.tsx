@@ -129,6 +129,7 @@ export function BookModal({
                   title={book.title}
                   author={book.author}
                   coverOptions={coverOptions}
+                  externalCoverUrl={book.externalCoverUrl}
                   selectedCoverIndex={selectedCoverIndex}
                   className="w-full h-full"
                 />
@@ -153,7 +154,7 @@ export function BookModal({
                 )}
               </div>
               
-              {coverOptions && selectedCoverIndex < coverOptions.length && (
+              {coverOptions && selectedCoverIndex < coverOptions.length && !book.externalCoverUrl && (
                 <div className="mt-3 text-center">
                   <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                     Style: {coverOptions[selectedCoverIndex].style}
@@ -240,7 +241,7 @@ export function BookModal({
               )}
               
               {/* Similar Books */}
-              {similarBooks.length > 0 && (
+              {(similarBooks.length > 0 || (metadata?.similarBooks && metadata.similarBooks.length > 0)) && (
                 <div className="mt-4">
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">
                     Similar Books You Might Enjoy
@@ -248,20 +249,66 @@ export function BookModal({
                   {loading ? (
                     <div className="animate-pulse h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {similarBooks.map((similarBook, index) => (
-                        <div 
-                          key={index}
-                          className="p-2 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        >
-                          <h5 className="font-medium text-gray-900 dark:text-white text-sm">
-                            {similarBook.title}
-                          </h5>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            by {similarBook.author}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Show metadata similar books first if available */}
+                      {metadata?.similarBooks && metadata.similarBooks.length > 0 ? (
+                        metadata.similarBooks.map((similarBook, index) => (
+                          <div 
+                            key={`metadata-${index}`}
+                            className="p-3 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                              <div className="flex-1">
+                                <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                                  {similarBook.title}
+                                </h5>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                  by {similarBook.author}
+                                </p>
+                                {similarBook.description && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                                    {similarBook.description}
+                                  </p>
+                                )}
+                              </div>
+                              {similarBook.lexileScore && similarBook.lexileScore > 0 && (
+                                <div className="shrink-0">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                    {similarBook.lexileScore}L
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        // Fall back to similar books from API
+                        similarBooks.map((similarBook, index) => (
+                          <div 
+                            key={`api-${index}`}
+                            className="p-3 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                              {similarBook.title}
+                            </h5>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              by {similarBook.author}
+                            </p>
+                            {similarBook.description && (
+                              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                                {similarBook.description}
+                              </p>
+                            )}
+                            {similarBook.lexileScore > 0 && (
+                              <div className="mt-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  {similarBook.lexileScore}L
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>

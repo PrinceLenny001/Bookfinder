@@ -110,6 +110,7 @@ export function Bookshelf({ className = "" }: BookshelfProps) {
                 title={book.title}
                 author={book.author}
                 coverOptions={book.coverOptions as any}
+                externalCoverUrl={book.externalCoverUrl}
                 className="w-full h-full object-cover transform transition-transform group-hover:scale-105"
               />
             </div>

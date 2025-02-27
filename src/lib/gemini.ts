@@ -140,7 +140,12 @@ export interface BookMetadata {
   contentWarnings: string[];
   themes: string[];
   lexileScore?: number;
-  similarBooks: { title: string; author: string }[];
+  similarBooks: {
+    title: string;
+    author: string;
+    description?: string;
+    lexileScore?: number;
+  }[];
 }
 
 // Add new helper function for Lexile validation
@@ -393,7 +398,12 @@ export async function getBookMetadata(
     2. contentWarnings: An array of strings for any content warnings (be specific and comprehensive)
     3. themes: An array of main themes in the book (provide at least 3-5 themes)
     4. lexileScore: A number representing the Lexile score if known (e.g., 800)
-    5. similarBooks: An array of 3-5 similar books with their titles and authors
+    5. similarBooks: An array of 5 similar books that readers would enjoy if they liked this book.
+       Each similar book should include:
+       - title: The book title
+       - author: The author's name
+       - description: A brief 1-2 sentence description of why it's similar
+       - lexileScore: An estimated Lexile score (if known)
 
     Format example: 
     {
@@ -402,12 +412,23 @@ export async function getBookMetadata(
       "themes": ["Adventure", "Friendship", "Coming of age", "Courage", "Identity"],
       "lexileScore": 800,
       "similarBooks": [
-        {"title": "Similar Book 1", "author": "Author 1"},
-        {"title": "Similar Book 2", "author": "Author 2"}
+        {
+          "title": "Similar Book 1", 
+          "author": "Author 1",
+          "description": "Features similar themes of friendship and adventure with comparable reading level.",
+          "lexileScore": 780
+        },
+        {
+          "title": "Similar Book 2", 
+          "author": "Author 2",
+          "description": "Another book with similar themes and style that fans of the original would enjoy.",
+          "lexileScore": 820
+        }
       ]
     }
     
-    If you don't know the exact Lexile score, provide your best estimate based on the book's complexity and target audience.`;
+    If you don't know the exact Lexile score, provide your best estimate based on the book's complexity and target audience.
+    For the similar books, focus on books that are truly similar in style, themes, and reading level - books that would genuinely appeal to someone who enjoyed "${title}".`;
 
     console.log("Sending prompt to Gemini:", prompt);
     const result = await makeRateLimitedRequest(
@@ -427,7 +448,12 @@ export async function getBookMetadata(
           contentWarnings: Array.isArray(metadata.contentWarnings) ? metadata.contentWarnings : [],
           themes: Array.isArray(metadata.themes) ? metadata.themes : [],
           lexileScore: typeof metadata.lexileScore === "number" ? metadata.lexileScore : undefined,
-          similarBooks: Array.isArray(metadata.similarBooks) ? metadata.similarBooks : [],
+          similarBooks: Array.isArray(metadata.similarBooks) ? metadata.similarBooks.map(book => ({
+            title: book.title,
+            author: book.author,
+            description: book.description || "",
+            lexileScore: typeof book.lexileScore === "number" ? book.lexileScore : 0
+          })) : [],
         };
       } catch (parseError) {
         console.error("Failed to parse JSON response:", parseError);

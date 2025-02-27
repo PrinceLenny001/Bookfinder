@@ -59,8 +59,9 @@ export function BookGrid({ books, onBookClick, className = "" }: BookGridProps) 
                 title={book.title}
                 author={book.author}
                 coverOptions={coverOptions}
+                externalCoverUrl={book.externalCoverUrl}
                 selectedCoverIndex={selectedCoverIndex}
-                className="w-full h-full"
+                className="w-full h-full object-cover"
               />
               
               {hasMultipleCovers && (

@@ -74,12 +74,13 @@ model Book {
   id          String   @id @default(cuid())
   title       String
   author      String
-  description String?
   lexileScore Int
+  description String?
+  coverOptions Json?
+  externalCoverUrl String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  coverOptions Json?   // Array of cover options
 
-  @@unique([title, author])
+  @@unique([title, author], name: "title_author")
   @@index([lexileScore])
 }

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getBookRecommendations, getBooksByGenre } from "@/lib/gemini";
 import type { BookRecommendation } from "@/lib/gemini";
 import type { Book as PrismaBook } from "@prisma/client";
+import { fetchBookCover } from "@/lib/utils/bookCovers";
 
 export type Book = {
   id: string;
@@ -12,6 +13,7 @@ export type Book = {
   createdAt: Date;
   updatedAt: Date;
   coverOptions?: any;
+  externalCoverUrl?: string | null;
 };
 
 export async function findOrCreateBook(title: string, author: string, lexileScore: number, description: string | null = null): Promise<Book> {
@@ -28,12 +30,22 @@ export async function findOrCreateBook(title: string, author: string, lexileScor
     return existingBook;
   }
 
+  // Try to fetch an external cover URL
+  let externalCoverUrl = null;
+  try {
+    externalCoverUrl = await fetchBookCover(title, author);
+  } catch (error) {
+    console.error(`Error fetching cover for ${title} by ${author}:`, error);
+  }
+
   return prisma.book.create({
     data: {
       title,
       author,
       lexileScore,
-      description
+      description,
+      externalCoverUrl,
+      coverOptions: generateDefaultCoverOptions(title, author)
     }
   });
 }
@@ -67,11 +79,40 @@ export async function getBooksByLexileRange(
       });
 
       if (titleBooks.length > 0) {
-        // Ensure each book has coverOptions
-        return titleBooks.map(book => ({
-          ...book,
-          coverOptions: book.coverOptions || generateDefaultCoverOptions(book.title, book.author)
+        // Ensure each book has coverOptions and try to fetch external covers if missing
+        const booksWithCovers = await Promise.all(titleBooks.map(async (book) => {
+          let updatedBook = { ...book };
+          
+          // If the book doesn't have coverOptions, add them
+          if (!book.coverOptions) {
+            updatedBook.coverOptions = generateDefaultCoverOptions(book.title, book.author);
+          }
+          
+          // If the book doesn't have an external cover URL, try to fetch one
+          if (!book.externalCoverUrl) {
+            try {
+              const coverUrl = await fetchBookCover(book.title, book.author);
+              if (coverUrl) {
+                updatedBook.externalCoverUrl = coverUrl;
+                
+                // Update the book in the database with the new cover URL
+                await prisma.book.update({
+                  where: { id: book.id },
+                  data: { 
+                    externalCoverUrl: coverUrl,
+                    coverOptions: updatedBook.coverOptions as any
+                  }
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching cover for ${book.title} by ${book.author}:`, error);
+            }
+          }
+          
+          return updatedBook;
         }));
+        
+        return booksWithCovers;
       }
     }
 
@@ -88,6 +129,14 @@ export async function getBooksByLexileRange(
           // Create or update books in the database
           const books = await Promise.all(
             recommendations.map(async (rec) => {
+              // Try to fetch an external cover URL
+              let externalCoverUrl = null;
+              try {
+                externalCoverUrl = await fetchBookCover(rec.title, rec.author);
+              } catch (error) {
+                console.error(`Error fetching cover for ${rec.title} by ${rec.author}:`, error);
+              }
+              
               // Check if book already exists
               const existingBook = await prisma.book.findFirst({
                 where: {
@@ -97,13 +146,15 @@ export async function getBooksByLexileRange(
               });
 
               if (existingBook) {
-                // If the book exists but doesn't have coverOptions, update it
+                // If the book exists but doesn't have coverOptions or externalCoverUrl, update it
                 if (!existingBook.coverOptions || 
-                    (Array.isArray(existingBook.coverOptions) && (existingBook.coverOptions as any).length === 0)) {
+                    (Array.isArray(existingBook.coverOptions) && (existingBook.coverOptions as any).length === 0) ||
+                    !existingBook.externalCoverUrl) {
                   return prisma.book.update({
                     where: { id: existingBook.id },
                     data: { 
-                      coverOptions: rec.coverOptions || generateDefaultCoverOptions(rec.title, rec.author)
+                      coverOptions: rec.coverOptions || generateDefaultCoverOptions(rec.title, rec.author),
+                      externalCoverUrl: externalCoverUrl || existingBook.externalCoverUrl
                     }
                   });
                 }
@@ -118,6 +169,7 @@ export async function getBooksByLexileRange(
                   lexileScore: rec.lexileScore,
                   description: rec.description || null,
                   coverOptions: rec.coverOptions || generateDefaultCoverOptions(rec.title, rec.author),
+                  externalCoverUrl
                 },
               });
             })
@@ -144,19 +196,43 @@ export async function getBooksByLexileRange(
       take: 20,
     });
 
-    // Ensure each book has coverOptions
+    // Ensure each book has coverOptions and try to fetch external covers if missing
     const booksWithCovers = await Promise.all(books.map(async (book) => {
+      let updatedBook = { ...book };
+      let needsUpdate = false;
+      
+      // If the book doesn't have coverOptions, add them
       if (!book.coverOptions || 
           (Array.isArray(book.coverOptions) && (book.coverOptions as any).length === 0)) {
-        // Update the book with default cover options
-        return prisma.book.update({
+        updatedBook.coverOptions = generateDefaultCoverOptions(book.title, book.author);
+        needsUpdate = true;
+      }
+      
+      // If the book doesn't have an external cover URL, try to fetch one
+      if (!book.externalCoverUrl) {
+        try {
+          const coverUrl = await fetchBookCover(book.title, book.author);
+          if (coverUrl) {
+            updatedBook.externalCoverUrl = coverUrl;
+            needsUpdate = true;
+          }
+        } catch (error) {
+          console.error(`Error fetching cover for ${book.title} by ${book.author}:`, error);
+        }
+      }
+      
+      // Update the book in the database if needed
+      if (needsUpdate) {
+        await prisma.book.update({
           where: { id: book.id },
           data: { 
-            coverOptions: generateDefaultCoverOptions(book.title, book.author)
+            coverOptions: updatedBook.coverOptions as any,
+            externalCoverUrl: updatedBook.externalCoverUrl
           }
         });
       }
-      return book;
+      
+      return updatedBook;
     }));
 
     // If we have at least 5 books, shuffle them and return 5

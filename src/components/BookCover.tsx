@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import Image from "next/image";
+import { fetchBookCover } from "@/lib/utils/bookCovers";
 
 interface BookCoverProps {
   title: string;
@@ -9,6 +11,7 @@ interface BookCoverProps {
     description: string;
     style: string;
   }[];
+  externalCoverUrl?: string | null;
   selectedCoverIndex?: number;
   className?: string;
 }
@@ -17,9 +20,31 @@ export function BookCover({
   title, 
   author, 
   coverOptions, 
+  externalCoverUrl: initialExternalCoverUrl,
   selectedCoverIndex = 0,
   className = "" 
 }: BookCoverProps) {
+  const [externalCoverUrl, setExternalCoverUrl] = useState<string | null>(initialExternalCoverUrl || null);
+  const [imageError, setImageError] = useState(false);
+  
+  // Fetch external cover if not provided
+  useEffect(() => {
+    if (!initialExternalCoverUrl && !externalCoverUrl && !imageError) {
+      const fetchCover = async () => {
+        try {
+          const coverUrl = await fetchBookCover(title, author);
+          setExternalCoverUrl(coverUrl);
+        } catch (error) {
+          console.error("Error fetching book cover:", error);
+          setImageError(true);
+        }
+      };
+      
+      fetchCover();
+    }
+  }, [title, author, initialExternalCoverUrl, externalCoverUrl, imageError]);
+  
+  // Generate a fallback cover style
   const coverStyle = useMemo(() => {
     const selectedCover = coverOptions?.[selectedCoverIndex];
     
@@ -74,6 +99,28 @@ export function BookCover({
     }
   }, [title, author]);
 
+  // Handle image loading error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // If we have an external cover URL and no error, show the image
+  if (externalCoverUrl && !imageError) {
+    return (
+      <div className={`relative w-full h-full overflow-hidden rounded-md ${className}`}>
+        <Image
+          src={externalCoverUrl}
+          alt={`Cover for ${title} by ${author}`}
+          fill
+          sizes="(max-width: 768px) 100vw, 300px"
+          className="object-cover"
+          onError={handleImageError}
+        />
+      </div>
+    );
+  }
+
+  // Otherwise, show the generated cover
   return (
     <div 
       className={`relative w-full h-full flex items-center justify-center overflow-hidden rounded-md ${className}`}

@@ -28,3 +28,4 @@
 - Improved Gemini API error handling for missing API key and better build compatibility
 - Added database caching for book information to improve performance and reduce Gemini API calls.
 - Fixed book covers display and added similar book recommendations with enhanced metadata retrieval from Gemini API.
+- Fixed book covers display with enhanced styling, added default cover options generation, and improved metadata display with better logging.
