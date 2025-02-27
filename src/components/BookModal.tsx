@@ -1,229 +1,230 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/trpc/react";
-import { type BookRecommendation } from "@/lib/gemini";
-import { BookMetadata } from "./BookMetadata";
-import { X, Bookmark, BookmarkCheck } from "lucide-react";
-import { LoadingSpinner } from "./LoadingSpinner";
-import { ErrorMessage } from "./ErrorMessage";
-import { BookCover } from "./BookCover";
+import { useState, useEffect } from "react";
+import { X, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { type Book } from "@/lib/db/books";
+import { generateBookDescription, getBookMetadata, type BookMetadata } from "@/lib/gemini";
+import { BookCover } from "./BookCover";
 
 interface BookModalProps {
-  book: Book | null;
+  book: Book;
   onClose: () => void;
+  isBookmarked?: boolean;
+  onBookmarkToggle?: (book: Book) => void;
 }
 
-export function BookModal({ book, onClose }: BookModalProps) {
-  const [currentBook, setCurrentBook] = useState<Book | null>(book);
-  const [bookHistory, setBookHistory] = useState<Book[]>(book ? [book] : []);
-  const [isBookmarked, setIsBookmarked] = useState(false);
-
-  if (!book || !currentBook) return null;
+export function BookModal({ 
+  book, 
+  onClose, 
+  isBookmarked = false,
+  onBookmarkToggle
+}: BookModalProps) {
+  const [description, setDescription] = useState<string | null>(book.description);
+  const [metadata, setMetadata] = useState<BookMetadata | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedCoverIndex, setSelectedCoverIndex] = useState(0);
+  
+  const coverOptions = book.coverOptions as { description: string; style: string; }[] | undefined;
+  const hasMultipleCovers = coverOptions && coverOptions.length > 1;
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
+    async function fetchBookDetails() {
+      if (!book) return;
+      
+      setLoading(true);
+      
+      try {
+        // If we don't have a description, fetch one
+        if (!book.description) {
+          const bookDescription = await generateBookDescription(book.title, book.author);
+          setDescription(bookDescription);
+        }
+        
+        // Fetch metadata
+        const bookMetadata = await getBookMetadata(book.title, book.author);
+        setMetadata(bookMetadata);
+      } catch (error) {
+        console.error("Error fetching book details:", error);
+      } finally {
+        setLoading(false);
       }
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
-  useEffect(() => {
-    const checkBookmark = () => {
-      const savedBooks = JSON.parse(localStorage.getItem("bookshelf") || "[]") as Book[];
-      setIsBookmarked(
-        savedBooks.some(
-          saved => saved.title === currentBook.title && saved.author === currentBook.author
-        )
-      );
-    };
-
-    checkBookmark();
-    window.addEventListener("bookshelfUpdate", checkBookmark);
-    return () => window.removeEventListener("bookshelfUpdate", checkBookmark);
-  }, [currentBook]);
-
-  const similarBooksQuery = api.books.getSimilarBooks.useQuery(
-    {
-      title: currentBook.title,
-      author: currentBook.author,
-      lexileScore: currentBook.lexileScore
-    },
-    { enabled: true }
-  );
-
-  const descriptionQuery = api.books.generateDescription.useQuery(
-    { title: currentBook.title, author: currentBook.author },
-    { enabled: true }
-  );
-
-  const metadataQuery = api.books.getMetadata.useQuery(
-    { title: currentBook.title, author: currentBook.author },
-    { enabled: true }
-  );
-
-  const handleBookClick = (newBook: Book) => {
-    setBookHistory(prev => [...prev, newBook]);
-    setCurrentBook(newBook);
-  };
-
-  const handleBack = () => {
-    if (bookHistory.length > 1) {
-      const newHistory = bookHistory.slice(0, -1);
-      setBookHistory(newHistory);
-      setCurrentBook(newHistory[newHistory.length - 1]);
     }
-  };
-
-  const handleBookmarkClick = () => {
-    const savedBooks = JSON.parse(localStorage.getItem("bookshelf") || "[]") as Book[];
     
-    if (isBookmarked) {
-      // Remove from bookshelf
-      const updatedBooks = savedBooks.filter(
-        saved => saved.title !== currentBook.title || saved.author !== currentBook.author
-      );
-      localStorage.setItem("bookshelf", JSON.stringify(updatedBooks));
-    } else {
-      // Add to bookshelf
-      savedBooks.push(currentBook);
-      localStorage.setItem("bookshelf", JSON.stringify(savedBooks));
-    }
+    fetchBookDetails();
+  }, [book]);
 
-    // Update bookmark state and notify other components
-    setIsBookmarked(!isBookmarked);
-    window.dispatchEvent(new CustomEvent('bookshelfUpdate'));
+  const handleCoverChange = (direction: 'next' | 'prev') => {
+    if (!hasMultipleCovers) return;
+    
+    setSelectedCoverIndex(prev => {
+      const maxIndex = (coverOptions?.length || 1) - 1;
+      
+      if (direction === 'next') {
+        return prev >= maxIndex ? 0 : prev + 1;
+      } else {
+        return prev <= 0 ? maxIndex : prev - 1;
+      }
+    });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="relative w-full max-w-4xl h-[90vh] bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-        <div className="h-full overflow-y-auto">
-          <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <div className="flex-1 pr-8">
-              <div className="flex items-center gap-2">
-                {bookHistory.length > 1 && (
-                  <button
-                    onClick={handleBack}
-                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
-                  >
-                    ← Back
-                  </button>
-                )}
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  {currentBook.title}
-                </h2>
-              </div>
-              <div className="flex items-center gap-4 mt-1">
-                <p className="text-gray-600 dark:text-gray-400">
-                  by {currentBook.author}
-                </p>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                  {currentBook.lexileScore}L
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+      <div 
+        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+            {book.title}
+          </h2>
+          <div className="flex items-center gap-2">
+            {onBookmarkToggle && (
               <button
-                onClick={handleBookmarkClick}
-                className="p-2 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
-                title={isBookmarked ? "Remove from bookshelf" : "Add to bookshelf"}
+                onClick={() => onBookmarkToggle(book)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label={isBookmarked ? "Remove from bookshelf" : "Add to bookshelf"}
               >
                 {isBookmarked ? (
-                  <BookmarkCheck className="h-5 w-5" />
+                  <BookmarkCheck className="w-5 h-5 text-blue-500" />
                 ) : (
-                  <Bookmark className="h-5 w-5" />
+                  <Bookmark className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 )}
               </button>
-              <button
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            </button>
           </div>
-
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="w-full md:w-1/3">
-                <BookCover
-                  title={currentBook.title}
-                  author={currentBook.author}
-                  priority={true}
-                  className="w-full max-w-sm mx-auto"
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Book Cover */}
+            <div className="relative aspect-[2/3] md:col-span-1">
+              <div className="relative w-full h-full rounded-lg overflow-hidden shadow-md">
+                <BookCover 
+                  title={book.title}
+                  author={book.author}
+                  coverOptions={coverOptions}
+                  selectedCoverIndex={selectedCoverIndex}
+                  className="w-full h-full"
                 />
+                
+                {hasMultipleCovers && (
+                  <>
+                    <button
+                      onClick={() => handleCoverChange('prev')}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 rounded-full p-2 hover:bg-white dark:hover:bg-gray-700"
+                      aria-label="Previous cover"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleCoverChange('next')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 rounded-full p-2 hover:bg-white dark:hover:bg-gray-700"
+                      aria-label="Next cover"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
               </div>
-
-              <div className="w-full md:w-2/3 space-y-6">
-                <div>
-                  <p className="text-lg mb-2">
-                    By <span className="font-medium">{currentBook.author}</span>
+              
+              {coverOptions && selectedCoverIndex < coverOptions.length && (
+                <div className="mt-3 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    Style: {coverOptions[selectedCoverIndex].style}
                   </p>
-                  {descriptionQuery.isLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <LoadingSpinner size="sm" />
-                    </div>
-                  ) : descriptionQuery.error ? (
-                    <ErrorMessage 
-                      message="Failed to load book description" 
-                      className="mt-2"
-                    />
-                  ) : descriptionQuery.data ? (
-                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {descriptionQuery.data}
-                    </p>
-                  ) : null}
                 </div>
-
-                <BookMetadata title={currentBook.title} author={currentBook.author} />
-
-                {similarBooksQuery.isLoading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <LoadingSpinner size="sm" />
-                  </div>
-                ) : similarBooksQuery.error ? (
-                  <ErrorMessage 
-                    message="Failed to load similar books" 
-                    className="mt-2"
-                  />
-                ) : similarBooksQuery.data && similarBooksQuery.data.length > 0 ? (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Similar Books</h3>
-                    <ul className="space-y-1">
-                      {similarBooksQuery.data.map((similar: Book, index: number) => (
-                        <li key={index}>
-                          <button
-                            onClick={() => handleBookClick(similar)}
-                            className="text-sm text-left w-full hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors"
-                          >
-                            <span className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                              {similar.title}
-                            </span>
-                            <span className="text-gray-500 dark:text-gray-400"> by {similar.author}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
+              )}
             </div>
-
-            <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-              <p>
-                Tip: Click anywhere outside this window or press the Escape key to
-                close
-              </p>
+            
+            {/* Book Details */}
+            <div className="md:col-span-2 flex flex-col">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {book.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  by {book.author}
+                </p>
+                <div className="mt-2 flex items-center">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {book.lexileScore}L
+                  </span>
+                  {metadata?.ageRange && (
+                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {metadata.ageRange}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Description */}
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                  Description
+                </h4>
+                {loading ? (
+                  <div className="animate-pulse h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                ) : description ? (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    {description}
+                  </p>
+                ) : (
+                  <p className="text-gray-500 dark:text-gray-400 italic">
+                    No description available.
+                  </p>
+                )}
+              </div>
+              
+              {/* Themes */}
+              {metadata?.themes && metadata.themes.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    Themes
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {metadata.themes.map((theme, index) => (
+                      <span 
+                        key={index}
+                        className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                      >
+                        {theme}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Content Warnings */}
+              {metadata?.contentWarnings && metadata.contentWarnings.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    Content Warnings
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {metadata.contentWarnings.map((warning, index) => (
+                      <span 
+                        key={index}
+                        className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                      >
+                        {warning}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
     </div>
   );
 } 

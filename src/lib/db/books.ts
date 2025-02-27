@@ -1,8 +1,18 @@
 import { prisma } from "@/lib/db";
-import type { Book } from "@prisma/client";
-import { getBookRecommendations as getGeminiBookRecommendations } from "@/lib/gemini";
+import { getBookRecommendations, getBooksByGenre } from "@/lib/gemini";
+import type { BookRecommendation } from "@/lib/gemini";
+import type { Book as PrismaBook } from "@prisma/client";
 
-export type { Book };
+export type Book = {
+  id: string;
+  title: string;
+  author: string;
+  lexileScore: number;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  coverOptions?: any;
+};
 
 export async function findOrCreateBook(title: string, author: string, lexileScore: number, description: string | null = null): Promise<Book> {
   const existingBook = await prisma.book.findUnique({
@@ -32,60 +42,107 @@ export async function getBooksByLexileRange(
   minLexile: number,
   maxLexile: number,
   genre: string | null = null,
-  title: string | undefined = undefined
+  title: string | null = null
 ): Promise<Book[]> {
-  // If searching by title, first check database
-  if (title) {
-    const dbBooks = await prisma.book.findMany({
-      where: {
-        title: {
-          contains: title,
-          mode: 'insensitive'
-        }
+  console.log(`Searching for books with Lexile range ${minLexile}-${maxLexile}, genre: ${genre}, title: ${title}`);
+  
+  try {
+    // If title is provided, search by title first
+    if (title) {
+      const titleBooks = await prisma.book.findMany({
+        where: {
+          title: {
+            contains: title,
+            mode: 'insensitive',
+          },
+          lexileScore: {
+            gte: minLexile,
+            lte: maxLexile,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 10,
+      });
+
+      if (titleBooks.length > 0) {
+        return titleBooks;
       }
-    });
-
-    // If we found books in DB, return them
-    if (dbBooks.length > 0) {
-      return dbBooks;
     }
-  }
 
-  // If searching by lexile range without title, check database first
-  if (!title) {
-    const dbBooks = await prisma.book.findMany({
+    // If genre is provided, we'll need to get recommendations from Gemini
+    if (genre) {
+      console.log(`Fetching books by genre: ${genre}`);
+      try {
+        // Get recommendations from Gemini API
+        const recommendations = await getBookRecommendations(minLexile, maxLexile, genre, title || undefined);
+        
+        if (recommendations && recommendations.length > 0) {
+          console.log(`Found ${recommendations.length} recommendations for genre ${genre}`);
+          
+          // Create or update books in the database
+          const books = await Promise.all(
+            recommendations.map(async (rec) => {
+              // Check if book already exists
+              const existingBook = await prisma.book.findFirst({
+                where: {
+                  title: { equals: rec.title, mode: 'insensitive' },
+                  author: { equals: rec.author, mode: 'insensitive' },
+                },
+              });
+
+              if (existingBook) {
+                return existingBook;
+              }
+
+              // Create new book
+              return prisma.book.create({
+                data: {
+                  title: rec.title,
+                  author: rec.author,
+                  lexileScore: rec.lexileScore,
+                  description: rec.description || null,
+                  coverOptions: rec.coverOptions || [],
+                },
+              });
+            })
+          );
+
+          return books;
+        }
+      } catch (error) {
+        console.error("Error getting books by genre:", error);
+      }
+    }
+
+    // Fallback to database query if no genre or if genre search failed
+    const books = await prisma.book.findMany({
       where: {
         lexileScore: {
           gte: minLexile,
-          lte: maxLexile
-        }
+          lte: maxLexile,
+        },
       },
-      take: 10,
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
+      take: 20,
     });
 
-    // If we found enough books in DB and no genre filter, return them in random order
-    if (dbBooks.length >= 5 && !genre) {
-      // Shuffle the array using Fisher-Yates algorithm
-      for (let i = dbBooks.length - 1; i > 0; i--) {
+    // If we have at least 5 books, shuffle them and return 5
+    if (books.length >= 5) {
+      // Fisher-Yates shuffle
+      for (let i = books.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [dbBooks[i], dbBooks[j]] = [dbBooks[j], dbBooks[i]];
+        [books[i], books[j]] = [books[j], books[i]];
       }
-      return dbBooks.slice(0, 5); // Return only 5 random books
+      return books.slice(0, 5);
     }
+
+    return books;
+  } catch (error) {
+    console.error("Error getting books by Lexile range:", error);
+    return [];
   }
-
-  // If we don't have enough books in DB or have a genre filter, get recommendations from Gemini
-  const geminiBooks = await getGeminiBookRecommendations(minLexile, maxLexile, genre, title);
-
-  // Save new books to database
-  const savedBooks = await Promise.all(
-    geminiBooks.map(book => 
-      findOrCreateBook(book.title, book.author, book.lexileScore, book.description)
-    )
-  );
-
-  return savedBooks;
 } 
