@@ -27,6 +27,12 @@ export function BookCover({
   const [externalCoverUrl, setExternalCoverUrl] = useState<string | null>(initialExternalCoverUrl || null);
   const [imageError, setImageError] = useState(false);
   
+  // Reset states when title or author changes
+  useEffect(() => {
+    setExternalCoverUrl(initialExternalCoverUrl || null);
+    setImageError(false);
+  }, [title, author, initialExternalCoverUrl]);
+  
   // Fetch external cover if not provided
   useEffect(() => {
     if (!initialExternalCoverUrl && !externalCoverUrl && !imageError) {

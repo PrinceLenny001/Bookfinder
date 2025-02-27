@@ -127,6 +127,10 @@ export function BookModal({
       setCurrentBook(book);
       setSelectedCoverIndex(0);
       setCurrentIsBookmarked(checkIsBookmarked(book));
+      
+      // Reset metadata and similar books to trigger a fresh fetch
+      setMetadata(null);
+      setSimilarBooks([]);
     } catch (error) {
       console.error("Error loading similar book:", error);
     } finally {
