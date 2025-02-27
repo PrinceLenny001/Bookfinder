@@ -33,8 +33,9 @@ export function BookCover({
       const hue2 = (hue1 + 40) % 360;
       
       return {
-        background: `linear-gradient(to bottom right, hsl(${hue1}, 70%, 85%), hsl(${hue2}, 70%, 75%))`,
+        background: `linear-gradient(135deg, hsl(${hue1}, 70%, 85%), hsl(${hue2}, 70%, 75%))`,
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
       };
     }
     
@@ -43,19 +44,47 @@ export function BookCover({
     
     return {
       background: selectedCover.style.includes('gradient') 
-        ? `linear-gradient(to bottom right, ${colors[0]}, ${colors[1]})`
+        ? `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`
         : colors[0],
       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
+      border: '1px solid rgba(0, 0, 0, 0.1)',
     };
   }, [title, author, coverOptions, selectedCoverIndex]);
+
+  // Generate a pattern for the cover background
+  const patternStyle = useMemo(() => {
+    const hash = (title + author).split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    
+    const patternType = Math.abs(hash) % 5;
+    
+    switch (patternType) {
+      case 0:
+        return { backgroundImage: 'radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.2) 1%, transparent 1%), radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.2) 1%, transparent 1%)' };
+      case 1:
+        return { backgroundImage: 'linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent)' };
+      case 2:
+        return { backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px), linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px)' };
+      case 3:
+        return { backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.2) 8%, transparent 8%)' };
+      case 4:
+      default:
+        return { backgroundImage: 'none' };
+    }
+  }, [title, author]);
 
   return (
     <div 
       className={`relative w-full h-full flex items-center justify-center overflow-hidden rounded-md ${className}`}
-      style={coverStyle}
+      style={{...coverStyle, ...patternStyle, backgroundSize: '20px 20px'}}
     >
+      {/* Book spine effect */}
+      <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-black/10 dark:bg-white/10"></div>
+      
+      {/* Book title and author */}
       <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-        <div className="bg-white/80 dark:bg-gray-800/80 p-2 rounded-md w-full">
+        <div className="bg-white/90 dark:bg-gray-800/90 p-2 rounded-md w-full shadow-sm">
           <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-1 line-clamp-3">
             {title}
           </h3>

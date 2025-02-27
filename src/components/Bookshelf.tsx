@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Trash2 } from "lucide-react";
 import { type Book } from "@/lib/db/books";
 import { BookCover } from "./BookCover";
 import { BookModal } from "./BookModal";
-import { Trash2 } from "lucide-react";
 
 interface BookshelfProps {
   className?: string;

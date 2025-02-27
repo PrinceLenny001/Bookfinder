@@ -67,7 +67,11 @@ export async function getBooksByLexileRange(
       });
 
       if (titleBooks.length > 0) {
-        return titleBooks;
+        // Ensure each book has coverOptions
+        return titleBooks.map(book => ({
+          ...book,
+          coverOptions: book.coverOptions || generateDefaultCoverOptions(book.title, book.author)
+        }));
       }
     }
 
@@ -93,6 +97,16 @@ export async function getBooksByLexileRange(
               });
 
               if (existingBook) {
+                // If the book exists but doesn't have coverOptions, update it
+                if (!existingBook.coverOptions || 
+                    (Array.isArray(existingBook.coverOptions) && (existingBook.coverOptions as any).length === 0)) {
+                  return prisma.book.update({
+                    where: { id: existingBook.id },
+                    data: { 
+                      coverOptions: rec.coverOptions || generateDefaultCoverOptions(rec.title, rec.author)
+                    }
+                  });
+                }
                 return existingBook;
               }
 
@@ -103,7 +117,7 @@ export async function getBooksByLexileRange(
                   author: rec.author,
                   lexileScore: rec.lexileScore,
                   description: rec.description || null,
-                  coverOptions: rec.coverOptions || [],
+                  coverOptions: rec.coverOptions || generateDefaultCoverOptions(rec.title, rec.author),
                 },
               });
             })
@@ -130,19 +144,63 @@ export async function getBooksByLexileRange(
       take: 20,
     });
 
-    // If we have at least 5 books, shuffle them and return 5
-    if (books.length >= 5) {
-      // Fisher-Yates shuffle
-      for (let i = books.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [books[i], books[j]] = [books[j], books[i]];
+    // Ensure each book has coverOptions
+    const booksWithCovers = await Promise.all(books.map(async (book) => {
+      if (!book.coverOptions || 
+          (Array.isArray(book.coverOptions) && (book.coverOptions as any).length === 0)) {
+        // Update the book with default cover options
+        return prisma.book.update({
+          where: { id: book.id },
+          data: { 
+            coverOptions: generateDefaultCoverOptions(book.title, book.author)
+          }
+        });
       }
-      return books.slice(0, 5);
+      return book;
+    }));
+
+    // If we have at least 5 books, shuffle them and return 5
+    if (booksWithCovers.length >= 5) {
+      // Fisher-Yates shuffle
+      for (let i = booksWithCovers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [booksWithCovers[i], booksWithCovers[j]] = [booksWithCovers[j], booksWithCovers[i]];
+      }
+      return booksWithCovers.slice(0, 5);
     }
 
-    return books;
+    return booksWithCovers;
   } catch (error) {
     console.error("Error getting books by Lexile range:", error);
     return [];
   }
+}
+
+// Helper function to generate default cover options
+function generateDefaultCoverOptions(title: string, author: string) {
+  // Generate a hash from the title and author for consistent colors
+  const hash = (title + author).split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+  
+  // Generate different cover styles based on the hash
+  const coverStyles = ['minimalist', 'watercolor', 'gradient', 'abstract', 'illustrated'];
+  const coverStyle1 = coverStyles[Math.abs(hash) % coverStyles.length];
+  const coverStyle2 = coverStyles[Math.abs(hash + 1) % coverStyles.length];
+  const coverStyle3 = coverStyles[Math.abs(hash + 2) % coverStyles.length];
+  
+  return [
+    {
+      description: `${title} by ${author} with a ${coverStyle1} design`,
+      style: coverStyle1
+    },
+    {
+      description: `${title} by ${author} with a ${coverStyle2} design`,
+      style: coverStyle2
+    },
+    {
+      description: `${title} by ${author} with a ${coverStyle3} design`,
+      style: coverStyle3
+    }
+  ];
 } 

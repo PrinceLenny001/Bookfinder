@@ -43,11 +43,13 @@ export function BookModal({
         
         // Fetch metadata
         const bookMetadata = await getBookMetadata(book.title, book.author);
+        console.log("Fetched metadata:", bookMetadata);
         setMetadata(bookMetadata);
         
         // Fetch similar books only if metadata doesn't have them
         if (!bookMetadata.similarBooks || bookMetadata.similarBooks.length === 0) {
           const recommendations = await getSimilarBooks(book.title);
+          console.log("Fetched similar books:", recommendations);
           setSimilarBooks(recommendations);
         } else {
           // Convert metadata similar books to BookRecommendation format

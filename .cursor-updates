@@ -27,3 +27,4 @@
 - Added Lexile score display to book cards, modal, and bookshelf
 - Improved Gemini API error handling for missing API key and better build compatibility
 - Added database caching for book information to improve performance and reduce Gemini API calls.
+- Fixed book covers display and added similar book recommendations with enhanced metadata retrieval from Gemini API.
