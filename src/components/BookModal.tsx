@@ -79,12 +79,27 @@ export function BookModal({
           setSimilarBooks(recommendations);
         } else {
           // Convert metadata similar books to BookRecommendation format
-          const metadataSimilarBooks: BookRecommendation[] = bookMetadata.similarBooks.map(book => ({
-            title: book.title,
-            author: book.author,
-            lexileScore: typeof book.lexileScore === 'number' ? book.lexileScore : 0,
-            description: book.description
-          }));
+          const metadataSimilarBooks: BookRecommendation[] = bookMetadata.similarBooks.map(book => {
+            // Ensure lexileScore is a number
+            let lexileScore = 0;
+            
+            if (typeof book.lexileScore === 'number') {
+              lexileScore = book.lexileScore;
+            } else if (typeof book.lexileScore === 'string') {
+              // Extract numeric part from string like "GN480L"
+              const matches = (book.lexileScore as string).match(/(\d+)/);
+              if (matches && matches[1]) {
+                lexileScore = parseInt(matches[1], 10);
+              }
+            }
+            
+            return {
+              title: book.title,
+              author: book.author,
+              lexileScore: lexileScore,
+              description: book.description
+            };
+          });
           setSimilarBooks(metadataSimilarBooks);
         }
       } catch (error) {
@@ -115,11 +130,25 @@ export function BookModal({
   const handleSimilarBookClick = async (similarBook: any) => {
     try {
       setLoading(true);
+      
+      // Ensure lexileScore is a number
+      let lexileScore = 0;
+      
+      if (typeof similarBook.lexileScore === 'number') {
+        lexileScore = similarBook.lexileScore;
+      } else if (typeof similarBook.lexileScore === 'string') {
+        // Extract numeric part from string like "GN480L"
+        const matches = (similarBook.lexileScore as string).match(/(\d+)/);
+        if (matches && matches[1]) {
+          lexileScore = parseInt(matches[1], 10);
+        }
+      }
+      
       // Find or create the book using tRPC mutation
       const book = await findOrCreateBookMutation.mutateAsync({
         title: similarBook.title,
         author: similarBook.author,
-        lexileScore: typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
+        lexileScore: lexileScore,
         description: similarBook.description || null
       });
       
@@ -142,11 +171,24 @@ export function BookModal({
   const handleSimilarBookBookmark = async (similarBook: any, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      // Ensure lexileScore is a number
+      let lexileScore = 0;
+      
+      if (typeof similarBook.lexileScore === 'number') {
+        lexileScore = similarBook.lexileScore;
+      } else if (typeof similarBook.lexileScore === 'string') {
+        // Extract numeric part from string like "GN480L"
+        const matches = (similarBook.lexileScore as string).match(/(\d+)/);
+        if (matches && matches[1]) {
+          lexileScore = parseInt(matches[1], 10);
+        }
+      }
+      
       // Find or create the book using tRPC mutation
       const book = await findOrCreateBookMutation.mutateAsync({
         title: similarBook.title,
         author: similarBook.author,
-        lexileScore: typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
+        lexileScore: lexileScore,
         description: similarBook.description || null
       });
       
@@ -365,6 +407,17 @@ export function BookModal({
                                  b.author.toLowerCase() === similarBook.author.toLowerCase()
                           );
                           
+                          // Ensure lexileScore is a number for display
+                          let lexileScore = 0;
+                          if (typeof similarBook.lexileScore === 'number') {
+                            lexileScore = similarBook.lexileScore;
+                          } else if (typeof similarBook.lexileScore === 'string') {
+                            const matches = (similarBook.lexileScore as string).match(/(\d+)/);
+                            if (matches && matches[1]) {
+                              lexileScore = parseInt(matches[1], 10);
+                            }
+                          }
+                          
                           return (
                             <div 
                               key={`metadata-${index}`}
@@ -386,9 +439,9 @@ export function BookModal({
                                   )}
                                 </div>
                                 <div className="shrink-0 flex flex-col gap-2 items-end">
-                                  {similarBook.lexileScore && similarBook.lexileScore > 0 && (
+                                  {lexileScore > 0 && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                      {similarBook.lexileScore}L
+                                      {lexileScore}L
                                     </span>
                                   )}
                                   {!isInBookshelf && (
@@ -413,6 +466,17 @@ export function BookModal({
                                  b.author.toLowerCase() === similarBook.author.toLowerCase()
                           );
                           
+                          // Ensure lexileScore is a number for display
+                          let lexileScore = 0;
+                          if (typeof similarBook.lexileScore === 'number') {
+                            lexileScore = similarBook.lexileScore;
+                          } else if (typeof similarBook.lexileScore === 'string') {
+                            const matches = (similarBook.lexileScore as string).match(/(\d+)/);
+                            if (matches && matches[1]) {
+                              lexileScore = parseInt(matches[1], 10);
+                            }
+                          }
+                          
                           return (
                             <div 
                               key={`api-${index}`}
@@ -432,10 +496,10 @@ export function BookModal({
                                       {similarBook.description}
                                     </p>
                                   )}
-                                  {similarBook.lexileScore > 0 && (
+                                  {lexileScore > 0 && (
                                     <div className="mt-1">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                        {similarBook.lexileScore}L
+                                        {lexileScore}L
                                       </span>
                                     </div>
                                   )}
