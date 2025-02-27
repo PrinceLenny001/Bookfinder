@@ -34,3 +34,4 @@
 - Enhanced BookModal component to make similar books clickable and added the ability to bookmark them directly from the recommendations list.
 - Fixed Prisma client browser error by replacing direct database calls with tRPC mutations in the BookModal component for similar book interactions.
 - Fixed book cover not updating when clicking on similar books by resetting state in BookCover component and clearing metadata to trigger fresh data fetching.
+- Corrected the Lexile score for "Out of My Mind" by Sharon M. Draper from incorrect value to the accurate 700L score.

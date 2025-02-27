@@ -50,6 +50,42 @@ export async function findOrCreateBook(title: string, author: string, lexileScor
   });
 }
 
+/**
+ * Updates the Lexile score of a book by title and author
+ */
+export async function updateBookLexileScore(title: string, author: string, newLexileScore: number): Promise<Book | null> {
+  try {
+    const book = await prisma.book.findUnique({
+      where: {
+        title_author: {
+          title,
+          author
+        }
+      }
+    });
+
+    if (!book) {
+      console.error(`Book not found: ${title} by ${author}`);
+      return null;
+    }
+
+    const updatedBook = await prisma.book.update({
+      where: {
+        id: book.id
+      },
+      data: {
+        lexileScore: newLexileScore
+      }
+    });
+
+    console.log(`Updated Lexile score for "${title}" by ${author} to ${newLexileScore}`);
+    return updatedBook;
+  } catch (error) {
+    console.error(`Error updating Lexile score for ${title} by ${author}:`, error);
+    return null;
+  }
+}
+
 export async function getBooksByLexileRange(
   minLexile: number,
   maxLexile: number,
