@@ -31,3 +31,4 @@
 - Fixed book covers display with enhanced styling, added default cover options generation, and improved metadata display with better logging.
 - Added real book covers from Open Library and Google Books APIs with fallback to generated covers, enhanced similar book recommendations with descriptions and Lexile scores.
 - Updated Gemini API to use the newer model version (gemini-1.5-pro-002) to fix 404 error with the deprecated gemini-pro model.
+- Enhanced BookModal component to make similar books clickable and added the ability to bookmark them directly from the recommendations list.
