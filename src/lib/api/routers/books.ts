@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, createTRPCRouter } from "../trpc";
 import { getBookRecommendations, getSimilarBooks, generateBookDescription, getBookMetadata, getBooksByGenre } from "../../gemini";
-import { getBooksByLexileRange } from "@/lib/db/books";
+import { getBooksByLexileRange, findOrCreateBook } from "@/lib/db/books";
 import { prisma } from "@/lib/db";
 
 const GENRES = [
@@ -93,5 +93,19 @@ export const booksRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return getBookMetadata(input.title, input.author);
+    }),
+    
+  findOrCreateBook: publicProcedure
+    .input(
+      z.object({
+        title: z.string(),
+        author: z.string(),
+        lexileScore: z.number(),
+        description: z.string().nullable(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { title, author, lexileScore, description } = input;
+      return findOrCreateBook(title, author, lexileScore, description);
     }),
 }); 

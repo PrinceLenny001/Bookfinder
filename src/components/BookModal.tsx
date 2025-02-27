@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { X, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { type Book, findOrCreateBook } from "@/lib/db/books";
+import { type Book } from "@/lib/db/books";
 import { generateBookDescription, getBookMetadata, getSimilarBooks, type BookMetadata, type BookRecommendation } from "@/lib/gemini";
 import { BookCover } from "./BookCover";
+import { api } from "@/lib/trpc/react";
 
 interface BookModalProps {
   book: Book;
@@ -27,6 +28,9 @@ export function BookModal({
   const [currentBook, setCurrentBook] = useState<Book>(book);
   const [currentIsBookmarked, setCurrentIsBookmarked] = useState<boolean>(isBookmarked);
   const [bookshelfBooks, setBookshelfBooks] = useState<Book[]>([]);
+  
+  // Initialize the tRPC mutation
+  const findOrCreateBookMutation = api.books.findOrCreateBook.useMutation();
   
   const coverOptions = currentBook.coverOptions as { description: string; style: string; }[] | undefined;
   const hasMultipleCovers = coverOptions && coverOptions.length > 1;
@@ -111,13 +115,13 @@ export function BookModal({
   const handleSimilarBookClick = async (similarBook: any) => {
     try {
       setLoading(true);
-      // Find or create the book in the database
-      const book = await findOrCreateBook(
-        similarBook.title,
-        similarBook.author,
-        typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
-        similarBook.description || null
-      );
+      // Find or create the book using tRPC mutation
+      const book = await findOrCreateBookMutation.mutateAsync({
+        title: similarBook.title,
+        author: similarBook.author,
+        lexileScore: typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
+        description: similarBook.description || null
+      });
       
       // Update the current book and reset state
       setCurrentBook(book);
@@ -134,13 +138,13 @@ export function BookModal({
   const handleSimilarBookBookmark = async (similarBook: any, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      // Find or create the book in the database
-      const book = await findOrCreateBook(
-        similarBook.title,
-        similarBook.author,
-        typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
-        similarBook.description || null
-      );
+      // Find or create the book using tRPC mutation
+      const book = await findOrCreateBookMutation.mutateAsync({
+        title: similarBook.title,
+        author: similarBook.author,
+        lexileScore: typeof similarBook.lexileScore === 'number' ? similarBook.lexileScore : 0,
+        description: similarBook.description || null
+      });
       
       // Add to bookshelf
       const updatedBooks = [...bookshelfBooks, book];
