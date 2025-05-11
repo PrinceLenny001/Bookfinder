@@ -27,17 +27,17 @@ export async function fetchBookCover(title: string, author: string): Promise<str
       return openLibraryCover;
     }
     
-    // Fall back to Google Books
+    // If Open Library fails, try Google Books
     const googleBooksCover = await fetchGoogleBooksCover(title, author);
     if (googleBooksCover) {
       coverCache.set(cacheKey, googleBooksCover);
       return googleBooksCover;
     }
     
-    // No cover found
+    // If both fail, return null
     return null;
   } catch (error) {
-    console.error(`Error fetching cover for ${title} by ${author}:`, error);
+    console.warn(`Error fetching book cover for "${title}" by ${author}:`, error);
     return null;
   }
 }
@@ -50,40 +50,51 @@ export async function fetchBookCover(title: string, author: string): Promise<str
  */
 async function fetchOpenLibraryCover(title: string, author: string): Promise<string | null> {
   try {
-    // Encode the title and author for the URL
-    const encodedTitle = encodeURIComponent(title);
-    const encodedAuthor = encodeURIComponent(author);
-    
-    // Search Open Library for the book
-    const response = await fetch(`https://openlibrary.org/search.json?title=${encodedTitle}&author=${encodedAuthor}`);
-    
-    if (!response.ok) {
-      throw new Error(`Open Library API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Check if we have any results
-    if (data.docs && data.docs.length > 0) {
-      // Get the first result
-      const book = data.docs[0];
-      
-      // Check if the book has a cover ID
-      if (book.cover_i) {
-        // Return the URL to the cover image (medium size)
-        return `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`;
+    // Format the search query
+    const searchQuery = `${title} ${author}`.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const searchUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}`;
+
+    // Add retry logic
+    let retries = 3;
+    let lastError: Error | null = null;
+
+    while (retries > 0) {
+      try {
+        const response = await fetch(searchUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Bookfinder/1.0 (https://github.com/yourusername/bookfinder)'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Open Library API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.docs && data.docs.length > 0) {
+          const firstResult = data.docs[0];
+          if (firstResult.cover_i) {
+            return `https://covers.openlibrary.org/b/id/${firstResult.cover_i}-L.jpg`;
+          }
+        }
+        return null;
+      } catch (error) {
+        lastError = error as Error;
+        retries--;
+        if (retries > 0) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, (3 - retries) * 1000));
+        }
       }
-      
-      // Check if the book has an ISBN
-      if (book.isbn && book.isbn.length > 0) {
-        // Return the URL to the cover image using the ISBN
-        return `https://covers.openlibrary.org/b/isbn/${book.isbn[0]}-M.jpg`;
-      }
     }
-    
+
+    // If we've exhausted all retries, log the error and return null
+    console.warn(`Failed to fetch cover for "${title}" by ${author} after 3 retries:`, lastError);
     return null;
   } catch (error) {
-    console.error(`Error fetching Open Library cover for ${title} by ${author}:`, error);
+    console.warn(`Error fetching Open Library cover for ${title} by ${author}:`, error);
     return null;
   }
 }

@@ -17,7 +17,7 @@ export type Book = {
 };
 
 export async function findOrCreateBook(title: string, author: string, lexileScore: number, description: string | null = null): Promise<Book> {
-  const existingBook = await prisma.book.findUnique({
+  let existingBook = await prisma.book.findUnique({
     where: {
       title_author: {
         title,
@@ -25,6 +25,25 @@ export async function findOrCreateBook(title: string, author: string, lexileScor
       }
     }
   });
+
+  // If the book exists but has no description, fetch and update it
+  if (existingBook && (!existingBook.description || existingBook.description.trim() === "")) {
+    let newDescription = description;
+    if (!newDescription) {
+      try {
+        // Use Gemini or fallback to a default
+        const { generateBookDescription } = await import("@/lib/gemini");
+        newDescription = await generateBookDescription(title, author);
+      } catch (error) {
+        console.error("Error generating book description:", error);
+        newDescription = "Description not available";
+      }
+    }
+    existingBook = await prisma.book.update({
+      where: { id: existingBook.id },
+      data: { description: newDescription }
+    });
+  }
 
   if (existingBook) {
     return existingBook;
@@ -158,10 +177,8 @@ export async function getBooksByLexileRange(
       try {
         // Get recommendations from Gemini API
         const recommendations = await getBookRecommendations(minLexile, maxLexile, genre, title || undefined);
-        
         if (recommendations && recommendations.length > 0) {
           console.log(`Found ${recommendations.length} recommendations for genre ${genre}`);
-          
           // Create or update books in the database
           const books = await Promise.all(
             recommendations.map(async (rec) => {
@@ -172,7 +189,6 @@ export async function getBooksByLexileRange(
               } catch (error) {
                 console.error(`Error fetching cover for ${rec.title} by ${rec.author}:`, error);
               }
-              
               // Check if book already exists
               const existingBook = await prisma.book.findFirst({
                 where: {
@@ -180,7 +196,6 @@ export async function getBooksByLexileRange(
                   author: { equals: rec.author, mode: 'insensitive' },
                 },
               });
-
               if (existingBook) {
                 // If the book exists but doesn't have coverOptions or externalCoverUrl, update it
                 if (!existingBook.coverOptions || 
@@ -196,7 +211,6 @@ export async function getBooksByLexileRange(
                 }
                 return existingBook;
               }
-
               // Create new book
               return prisma.book.create({
                 data: {
@@ -210,11 +224,12 @@ export async function getBooksByLexileRange(
               });
             })
           );
-
           return books;
         }
       } catch (error) {
-        console.error("Error getting books by genre:", error);
+        console.error("Error getting books by genre (Gemini API failed):", error);
+        // If Gemini fails, return an empty array (do not fallback to local DB)
+        return [];
       }
     }
 

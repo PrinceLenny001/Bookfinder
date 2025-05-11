@@ -36,3 +36,6 @@
 - Fixed book cover not updating when clicking on similar books by resetting state in BookCover component and clearing metadata to trigger fresh data fetching.
 - Corrected the Lexile score for "Out of My Mind" by Sharon M. Draper from incorrect value to the accurate 700L score.
 - Fixed JSON parsing error for non-numeric Lexile scores by adding robust parsing for string-formatted Lexile scores like "GN480L" in the BookModal component.
+- Fixed missing book descriptions: backend now fetches and saves a description if a book exists without one, ensuring the modal always displays a description.
+- Added fallback for genre searches: if Gemini API fails, the backend now returns books from the local database matching the genre and Lexile range.
+- Removed fallback to local books for genre queries; now only Gemini-provided data is used for genre searches, ensuring Lexile and all book data are from Gemini.
